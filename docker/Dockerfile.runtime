@@ -1,0 +1,12 @@
+FROM eclipse-temurin:21-jre-alpine
+LABEL maintainer="MagicOps <dev@cywu.top>"
+
+WORKDIR /app
+
+COPY magicops-runtime/target/magicops-runtime-0.1.0-SNAPSHOT.jar app.jar
+
+ENV JAVA_OPTS="-Xms256m -Xmx512m"
+
+EXPOSE 8081
+
+ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar app.jar"]

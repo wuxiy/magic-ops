@@ -1,0 +1,11 @@
+# Runtime 生产环境配置（PostgreSQL）
+server:
+  port: 8081
+
+spring:
+  application:
+    name: magicops-runtime
+
+logging:
+  level:
+    top.cywu.magicops: INFO
