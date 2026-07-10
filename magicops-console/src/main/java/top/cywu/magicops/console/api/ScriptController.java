@@ -1,17 +1,24 @@
 package top.cywu.magicops.console.api;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import jakarta.validation.Valid;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import top.cywu.magicops.console.dto.*;
 import top.cywu.magicops.console.entity.ApprovalEntity;
 import top.cywu.magicops.console.entity.ScriptEntity;
-import top.cywu.magicops.console.entity.ScriptVersionEntity;
+import top.cywu.magicops.console.publish.PackageBuildService;
+import top.cywu.magicops.console.publish.PushService;
 import top.cywu.magicops.console.repository.ScriptRepository;
 import top.cywu.magicops.console.service.ScriptLifecycleService;
+import top.cywu.magicops.sign.model.PublishPackage;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * 脚本管理 REST API。最小 Console API，用于驱动脚本生命周期闭环。
@@ -22,11 +29,24 @@ public class ScriptController {
 
     private final ScriptLifecycleService lifecycleService;
     private final ScriptRepository scriptRepository;
+    private final PackageBuildService packageBuildService;
+    private final PushService pushService;
+    private final ObjectMapper objectMapper;
+
+    @Value("${magicops.runtime.url:http://localhost:8081}")
+    private String runtimeUrl;
 
     public ScriptController(ScriptLifecycleService lifecycleService,
-                            ScriptRepository scriptRepository) {
+                            ScriptRepository scriptRepository,
+                            PackageBuildService packageBuildService,
+                            PushService pushService) {
         this.lifecycleService = lifecycleService;
         this.scriptRepository = scriptRepository;
+        this.packageBuildService = packageBuildService;
+        this.pushService = pushService;
+        this.objectMapper = new ObjectMapper()
+                .registerModule(new JavaTimeModule())
+                .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
     }
 
     @PostMapping
@@ -77,5 +97,37 @@ public class ScriptController {
         ApprovalEntity approval = lifecycleService.decide(
                 id, request.decision(), "reviewer", request.comment());
         return ResponseEntity.ok(approval);
+    }
+
+    /**
+     * 构建、签名并推送发布包到 Runtime。
+     */
+    @PostMapping("/publish")
+    public ResponseEntity<Map<String, Object>> publish(@RequestBody Map<String, Object> request) {
+        try {
+            @SuppressWarnings("unchecked")
+            List<Number> scriptIdNumbers = (List<Number>) request.get("scriptIds");
+            List<Long> scriptIds = scriptIdNumbers.stream().map(Number::longValue).toList();
+            String environment = (String) request.getOrDefault("environment", "development");
+
+            PublishPackage pkg = packageBuildService.buildAndSign(scriptIds, environment, "publisher");
+            String packageJson = objectMapper.writeValueAsString(pkg.toMap());
+            boolean pushed = pushService.push(runtimeUrl, packageJson);
+
+            if (pushed) {
+                return ResponseEntity.ok(Map.of(
+                        "status", "published",
+                        "scriptIds", scriptIds,
+                        "environment", environment,
+                        "runtimeUrl", runtimeUrl));
+            } else {
+                return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body(Map.of(
+                        "status", "push_failed",
+                        "runtimeUrl", runtimeUrl));
+            }
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
+                    "status", "error", "message", e.getMessage()));
+        }
     }
 }

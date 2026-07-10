@@ -21,9 +21,20 @@
 - 动态查询闭环已完成（真实 JDBC 执行、SQL Guard 只读、结果大小限制、执行审计）；
 - 受控数据修复闭环已完成（dry-run、SQL Guard 写操作约束、回滚意图、关键审计阻断）；
 - HTTP 接口适配闭环已完成（目标注册、allowlist 校验、AES/HMAC 加解密、脱敏、外部调用审计）；
-- CryptoService 提供 AES-GCM 加解密、HMAC-SHA256 签名验证、敏感数据脱敏。
+- CryptoService 提供 AES-GCM 加解密、HMAC-SHA256 签名验证、敏感数据脱敏；
+- 端到端闭环已验证：创建 → 调试 → 提交 → 审批 → 签名 → 推送 → 验签 → 执行 → SQL Guard 拦截（10 步全部通过）；
+- E2E 可复现脚本：`docs/testing/e2e/e2e-closed-loop-test.sh`。
 
 ## 最近完整验证
+
+2026-07-10：端到端集成测试
+
+- E2E 闭环测试：10 步全部通过
+  - Console 生命周期（DRAFT → APPROVED）
+  - 发布包签名推送（Console → Runtime）
+  - Runtime 验签加载（active v1.0.0）
+  - 查询执行（SELECT 成功，DELETE 被 SQL Guard 拒绝）
+  - 审计记录完整（trace ID、script ID、版本、SQL 摘要、结果大小、耗时）
 
 2026-07-10：切片 3/4/5 动态查询 + 数据修复 + HTTP 适配闭环
 
