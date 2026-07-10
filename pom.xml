@@ -38,6 +38,7 @@
         <module>magicops-crypto</module>
         <module>magicops-console</module>
         <module>magicops-runtime</module>
+        <module>magicops-diagnosis</module>
     </modules>
 
     <dependencyManagement>
@@ -76,6 +77,11 @@
             <dependency>
                 <groupId>top.cywu</groupId>
                 <artifactId>magicops-crypto</artifactId>
+                <version>${magicops.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>top.cywu</groupId>
+                <artifactId>magicops-diagnosis</artifactId>
                 <version>${magicops.version}</version>
             </dependency>
         </dependencies>

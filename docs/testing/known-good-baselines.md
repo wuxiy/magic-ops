@@ -2,74 +2,39 @@
 
 ## 当前基线
 
-截至 2026-07-10 的已知良好状态：
+截至 2026-07-11 的已知良好状态：
 
-- 文档结构遵循 AGE 风格路由模型；
-- 第一阶段范围已文档化；
-- 架构发布信任边界已文档化；
-- Maven 多模块脚手架已建立（Spring Boot 3.3.5，JDK 21）；
-- magic-api 上游代码已通过 git subtree 引入（前缀 `magic-api-source`，暂不参与主构建）；
-- 验证命令已替换为真实 Maven 命令；
-- 脚本生命周期元模型已建立（Script、Draft、Version、Approval 实体）；
-- 脚本状态机已实现（12 种状态，完整迁移路径覆盖）；
-- 审计服务最小实现已就位（内存存储，关键审计阻断）；
-- PostgreSQL 元数据库 Flyway 迁移脚本 V1 已建立；
-- Console REST API 最小闭环已实现（创建、草稿、版本、提交、审批）；
-- 发布包签名与验签已实现（SHA-256 + SHA256withRSA，canonical JSON，环境/keyId 校验）；
-- Console 可构建并签名发布包，Runtime 可接收并验证发布包；
-- Runtime 拒绝规则已测试覆盖（hash 不匹配、环境不匹配、未知 keyId）；
-- 动态查询闭环已完成（真实 JDBC 执行、SQL Guard 只读、结果大小限制、执行审计）；
-- 受控数据修复闭环已完成（dry-run、SQL Guard 写操作约束、回滚意图、关键审计阻断）；
-- HTTP 接口适配闭环已完成（目标注册、allowlist 校验、AES/HMAC 加解密、脱敏、外部调用审计）；
-- CryptoService 提供 AES-GCM 加解密、HMAC-SHA256 签名验证、敏感数据脱敏；
-- 端到端闭环已验证：创建 → 调试 → 提交 → 审批 → 签名 → 推送 → 验签 → 执行 → SQL Guard 拦截（10 步全部通过）；
-- E2E 可复现脚本：`docs/testing/e2e/e2e-closed-loop-test.sh`。
+**第一阶段（切片 0-5）**：项目脚手架、脚本生命周期、签名验签、动态查询、数据修复、HTTP 适配、E2E 10 步闭环。
+
+**第二阶段（切片 6-11）**：元数据持久化（Flyway V1-V6，19 张表）、用户管理与 BCrypt 认证、RBAC 7 角色 17 权限、审计 PostgreSQL 持久化与脱敏、密钥管理 JKS + SM4 国密、Docker Compose 部署配置。
+
+**第三阶段（切片 12-15）**：Docker 生产配置、资源级权限 @ResourcePermission + AOP、Runtime 拦截器流水线（TraceId + 限流 + 响应脱敏）、密钥轮换服务。
+
+**第三阶段（切片 17）**：文档全量同步、Arthas 诊断中心需求与架构设计、magicops-diagnosis 模块骨架。
+
+**测试**：148 个单元测试全部通过。
 
 ## 最近完整验证
+
+2026-07-11：切片 12-15 功能完善
+
+- `mvn test`：通过（148 个测试，0 失败）
+  - 密钥轮换测试 7 个（初始化/轮换/多轮换共存/旧密钥可用/移除/异常）
+  - RBAC 全覆盖测试 10 个（7 种角色权限隔离 + 交叉验证）
+  - 前序测试 131 个继续通过
+
+2026-07-11：切片 9-11 审计持久化 + 密钥管理 + Docker
+
+- `mvn test`：通过（130 个测试，0 失败）
+  - 审计服务测试 8 个（写入/查询/脱敏/关键审计）
+  - SM4 国密测试 5 个（往返/空串/长文/错误密钥/不同 IV）
 
 2026-07-10：端到端集成测试
 
 - E2E 闭环测试：10 步全部通过
-  - Console 生命周期（DRAFT → APPROVED）
-  - 发布包签名推送（Console → Runtime）
-  - Runtime 验签加载（active v1.0.0）
-  - 查询执行（SELECT 成功，DELETE 被 SQL Guard 拒绝）
-  - 审计记录完整（trace ID、script ID、版本、SQL 摘要、结果大小、耗时）
-
-2026-07-10：切片 3/4/5 动态查询 + 数据修复 + HTTP 适配闭环
-
-- `mvn test`：通过（100 个测试，0 失败）
-  - SQL Guard 测试 29 个（分类、只读策略、修复约束、危险语句拦截）
-  - 查询执行测试 6 个（真实 JDBC、非 SELECT 拒绝、审计字段、结果限制）
-  - 修复执行测试 8 个（dry-run、WHERE 检查、审计阻断、自由 UPDATE 拒绝）
-  - HTTP 适配测试 9 个（目标注册、allowlist、trace ID、加解密、脱敏、关键审计）
-  - 前序测试 48 个继续通过
-
-2026-07-10：切片 2 发布包签名和 Runtime 验签
-
-- `mvn test`：通过（48 个测试，0 失败）
-  - 签名测试 8 个（签名/验签往返、篡改拒绝、canonical 稳定性）
-  - Runtime 验签测试 5 个（合法接受、hash 拒绝、环境拒绝、keyId 拒绝、审计写入）
-  - 前序测试 35 个继续通过
-
-2026-07-10：切片 1 脚本生命周期和元数据模型
-
-- `mvn compile`：通过
-- `mvn test`：通过（36 个测试，0 失败）
-  - 状态机测试 28 个（合法路径 + 非法拒绝 + 参数化覆盖）
-  - 生命周期集成测试 4 个（DRAFT 到 APPROVED、拒绝、非法迁移、审批审计）
-  - 基础模块测试 4 个
-
-2026-07-10：切片 0 仓库脚手架
-
-- `mvn compile`：通过
-- `mvn test`：通过（3 个测试，0 失败）
-- Console 启动验证：通过（HTTP 401/404 符合预期）
-- Runtime 启动验证：通过（HTTP 401/404 符合预期）
 
 ## 待验证
 
-- magic-api fork 代码整合（javax 到 jakarta 迁移）；
-- Runtime API 契约；
-- 发布包签名和验签（切片 2）；
-- 审计服务持久化接入。
+- magic-api fork 代码整合（javax → jakarta 迁移，切片 16）；
+- Docker Compose 端到端验证（`docker-compose up` + E2E 在 PostgreSQL 上执行）；
+- 达梦数据库真实环境验证。

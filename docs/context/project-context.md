@@ -15,27 +15,36 @@
 
 当前可信部分：
 
-- 第一阶段范围；
+- 第一阶段范围（切片 0-5 全部完成）；
+- 第二阶段生产可用（切片 6-11 全部完成）；
+- 第三阶段功能完善（切片 12-15 完成，切片 16-17 部分完成）；
 - Console 到 Runtime 在线推送发布决策；
 - 平台持有签名私钥决策；
 - 动态 API 与数据修复共用脚本生命周期决策；
-- Arthas 第二阶段定位；
-- Maven 多模块脚手架和构建/验证命令。
+- Arthas 诊断中心需求和架构设计已完成；
+- Maven 多模块脚手架和构建/验证命令；
+- 148 个测试全部通过；
+- E2E 10 步闭环验证通过。
 
 仍不完整或尚未验证：
 
-- fork 后的具体代码结构；
-- 数据库 schema 来源；
-- Runtime API 契约。
+- magic-api fork 代码整合（javax → jakarta 迁移，切片 16）；
+- 达梦数据库真实环境验证（当前使用 H2）；
+- Docker Compose 端到端验证（Dockerfile 已创建，未执行 `docker-compose up`）。
 
 ## 当前技术基线
 
-- 当前仓库状态：脚手架已完成，Maven 多模块项目已建立，Console 和 Runtime 可独立启动。
-- 后端目标栈：Java、Spring Boot、magic-api fork、PostgreSQL、Spring Security。
+- 当前仓库状态：三阶段实现完成，148 个测试通过，19 张数据库表，10 个模块。
+- 后端栈：Java 21、Spring Boot 3.3.5、Spring Security、Spring Data JPA、Flyway、PostgreSQL。
 - 前端/编辑器目标栈：第一阶段复用或扩展 `magic-editor`，后续再评估 UI 重写。
-- 数据库/模型来源：尚未创建；未来 schema/model 文件将成为数据库事实源。
+- 数据库 schema：Flyway V1-V6 迁移脚本管理，`ddl-auto=none`。
+- 认证：数据库用户 + BCrypt + UserDetailsService（替换了静态 admin/admin）。
+- 授权：@PreAuthorize 方法级 + @ResourcePermission 资源级 + 7 角色 17 权限。
+- 审计：PostgreSQL 持久化 + 敏感数据脱敏 + 分页查询 API。
+- 密钥管理：KeyRotationService（轮换/共存/移除）+ JKS 文件 + SM4 国密。
+- Runtime 流水线：TraceIdFilter → RateLimitFilter → ResponseMaskingFilter。
 - 发布模型：Console 在线推送已签名发布包到 Runtime。
-- Runtime 签名模型：平台使用私钥签名，Runtime 使用公钥验签。
+- 部署：Docker Compose（PostgreSQL + Console + Runtime）。
 
 ## 验证命令
 
@@ -45,20 +54,21 @@
 | 安装到本地仓库 | `mvn install -DskipTests` |
 | 编译检查 | `mvn compile` |
 | 构建（含打包） | `mvn package -DskipTests` |
-| 单元测试 | `mvn test` |
-| 集成测试 | `mvn verify`（集成测试待补充） |
+| 单元测试 | `mvn test`（148 个测试） |
+| E2E 闭环测试 | `bash docs/testing/e2e/e2e-closed-loop-test.sh` |
 | Console 本地启动 | `java -jar magicops-console/target/magicops-console-0.1.0-SNAPSHOT.jar` |
 | Runtime 本地启动 | `java -jar magicops-runtime/target/magicops-runtime-0.1.0-SNAPSHOT.jar` |
+| Docker 一键启动 | `docker-compose up` |
 
-Console 默认端口 8080，Runtime 默认端口 8081。启动后可通过 HTTP Basic 认证访问。
+Console 默认端口 8080，Runtime 默认端口 8081。默认管理员：admin / magicops-admin。
 
 ## 当前启用的可选层
 
 - [x] `docs/audits/`
 - [x] `docs/testing/`
+- [x] `docs/discussions/`
 - [ ] `docs/analysis/`
 - [ ] `docs/lessons/`
-- [ ] `docs/discussions/`
 - [ ] `docs/skills/`
 - [ ] `docs/retrospectives/`
 
