@@ -1,0 +1,27 @@
+version: "3.8"
+
+# 达梦数据库测试环境
+services:
+  dm8:
+    image: if010/dameng:latest
+    container_name: magicops-dm8
+    environment:
+      PAGE_SIZE: 16
+      LD_LIBRARY_PATH: /opt/dmdbms/bin
+      EXTENT_SIZE: 32
+      BLANK_PAD_MODE: 1
+      LOG_SIZE: 1024
+      UNICODE_FLAG: 1
+      INSTANCE_NAME: DMSERVER
+    ports:
+      - "5236:5236"
+    volumes:
+      - dmdata:/opt/dmdbms/data
+    healthcheck:
+      test: ["CMD", "bash", "-c", "echo 'SELECT 1;' | /opt/dmdbms/bin/disql SYSDBA/SYSDBA"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  dmdata:

@@ -5,6 +5,16 @@ server:
 spring:
   application:
     name: magicops-runtime
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:magicops}
+    driver-class-name: org.postgresql.Driver
+    username: ${DB_USERNAME:magicops}
+    password: ${DB_PASSWORD:magicops}
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 2
+      idle-timeout: 300000
+      connection-timeout: 30000
 
 logging:
   level:

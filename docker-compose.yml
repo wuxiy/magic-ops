@@ -33,6 +33,7 @@ services:
       DB_NAME: magicops
       DB_USERNAME: magicops
       DB_PASSWORD: magicops
+      CONSOLE_ADMIN_PASSWORD: magicops-admin
       MAGICOPS_KEY_ID: magicops-default
       MAGICOPS_ENVIRONMENT: development
       MAGICOPS_ADMIN_PASSWORD: magicops-admin
@@ -49,6 +50,12 @@ services:
       postgres:
         condition: service_healthy
     environment:
+      SPRING_PROFILES_ACTIVE: prod
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: magicops
+      DB_USERNAME: magicops
+      DB_PASSWORD: magicops
       MAGICOPS_KEY_ID: magicops-default
       MAGICOPS_ENVIRONMENT: development
     ports:

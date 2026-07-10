@@ -6,6 +6,7 @@ WORKDIR /app
 COPY magicops-runtime/target/magicops-runtime-0.1.0-SNAPSHOT.jar app.jar
 
 ENV JAVA_OPTS="-Xms256m -Xmx512m"
+ENV SPRING_PROFILES_ACTIVE=prod
 
 EXPOSE 8081
 
