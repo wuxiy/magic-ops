@@ -1,0 +1,58 @@
+version: "3.8"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: magicops-postgres
+    environment:
+      POSTGRES_DB: magicops
+      POSTGRES_USER: magicops
+      POSTGRES_PASSWORD: magicops
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U magicops"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  console:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.console
+    container_name: magicops-console
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: magicops
+      DB_USERNAME: magicops
+      DB_PASSWORD: magicops
+      MAGICOPS_KEY_ID: magicops-default
+      MAGICOPS_ENVIRONMENT: development
+      MAGICOPS_ADMIN_PASSWORD: magicops-admin
+      RUNTIME_URL: http://runtime:8081
+    ports:
+      - "8080:8080"
+
+  runtime:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.runtime
+    container_name: magicops-runtime
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      MAGICOPS_KEY_ID: magicops-default
+      MAGICOPS_ENVIRONMENT: development
+    ports:
+      - "8081:8081"
+
+volumes:
+  pgdata:
