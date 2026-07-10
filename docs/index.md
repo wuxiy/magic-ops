@@ -25,6 +25,7 @@
 | 选择下一项工作 | `docs/backlog/README.md` | 当前需求和 owner docs |
 | 理解项目目标和产品形态 | `docs/architecture/project-vision.md` | `docs/design/app-overview.md` |
 | 理解第一阶段范围 | `docs/requirements/2026-07-09-0000-first-stage-platform-foundation.md` | `docs/architecture/decisions/0001-first-stage-scope-and-runtime-release.md` |
+| 理解第二阶段生产就绪计划 | `docs/plans/2026-07-11-0000-second-stage-production-ready.md` | `docs/design/roles-and-permissions.md` |
 | 理解产品行为和用户角色 | `docs/design/app-overview.md` | `docs/design/roles-and-permissions.md`, `docs/design/flow-overview.md` |
 | 理解术语和领域语言 | `docs/design/domain-glossary.md` | 相关设计或架构文档 |
 | 理解技术基线 | `docs/architecture/system-baseline.md` | `docs/architecture/module-boundaries.md` |
