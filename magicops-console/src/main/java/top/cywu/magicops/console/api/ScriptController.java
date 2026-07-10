@@ -7,7 +7,9 @@ import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import top.cywu.magicops.core.model.Permissions;
 import top.cywu.magicops.console.dto.*;
 import top.cywu.magicops.console.entity.ApprovalEntity;
 import top.cywu.magicops.console.entity.ScriptEntity;
@@ -50,6 +52,7 @@ public class ScriptController {
     }
 
     @PostMapping
+    @PreAuthorize("hasAuthority('" + Permissions.SCRIPT_CREATE + "')")
     public ResponseEntity<ScriptResponse> create(@Valid @RequestBody CreateScriptRequest request) {
         ScriptEntity script = lifecycleService.createScript(
                 request.name(), request.projectCode(), request.scriptType(), "system");
@@ -72,6 +75,7 @@ public class ScriptController {
     }
 
     @PutMapping("/{id}/draft")
+    @PreAuthorize("hasAuthority('" + Permissions.SCRIPT_EDIT + "')")
     public ResponseEntity<Void> updateDraft(@PathVariable Long id,
                                             @RequestBody UpdateDraftRequest request) {
         lifecycleService.updateDraft(id, request.content(), request.routePath(), request.routeMethod());
@@ -79,6 +83,7 @@ public class ScriptController {
     }
 
     @PostMapping("/{id}/versions")
+    @PreAuthorize("hasAuthority('" + Permissions.SCRIPT_SUBMIT + "')")
     public ResponseEntity<Void> createVersion(@PathVariable Long id,
                                               @Valid @RequestBody CreateVersionRequest request) {
         lifecycleService.createVersion(id, request.version(), request.riskLevel(), "system");
@@ -86,12 +91,14 @@ public class ScriptController {
     }
 
     @PostMapping("/{id}/submit")
+    @PreAuthorize("hasAuthority('" + Permissions.SCRIPT_SUBMIT + "')")
     public ResponseEntity<Void> submit(@PathVariable Long id) {
         lifecycleService.submitForApproval(id, "system");
         return ResponseEntity.ok().build();
     }
 
     @PostMapping("/{id}/approve")
+    @PreAuthorize("hasAuthority('" + Permissions.SCRIPT_APPROVE + "')")
     public ResponseEntity<ApprovalEntity> approve(@PathVariable Long id,
                                                   @Valid @RequestBody ApprovalRequest request) {
         ApprovalEntity approval = lifecycleService.decide(
@@ -103,6 +110,7 @@ public class ScriptController {
      * 构建、签名并推送发布包到 Runtime。
      */
     @PostMapping("/publish")
+    @PreAuthorize("hasAuthority('" + Permissions.SCRIPT_PUBLISH + "')")
     public ResponseEntity<Map<String, Object>> publish(@RequestBody Map<String, Object> request) {
         try {
             @SuppressWarnings("unchecked")

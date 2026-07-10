@@ -3,6 +3,7 @@ package top.cywu.magicops.console.api.security;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import top.cywu.magicops.console.dto.security.AssignRoleRequest;
 import top.cywu.magicops.console.dto.security.CreateUserRequest;
@@ -10,6 +11,7 @@ import top.cywu.magicops.console.dto.security.UserResponse;
 import top.cywu.magicops.console.entity.security.RoleEntity;
 import top.cywu.magicops.console.entity.security.UserEntity;
 import top.cywu.magicops.console.service.security.UserService;
+import top.cywu.magicops.core.model.Permissions;
 
 import java.util.List;
 import java.util.Map;
@@ -19,6 +21,7 @@ import java.util.Map;
  */
 @RestController
 @RequestMapping("/api/users")
+@PreAuthorize("hasAuthority('" + Permissions.USER_MANAGE + "')")
 public class UserController {
 
     private final UserService userService;

@@ -15,7 +15,7 @@ CONSOLE_PORT=8080
 RUNTIME_PORT=8081
 CONSOLE_URL="http://localhost:$CONSOLE_PORT"
 RUNTIME_URL="http://localhost:$RUNTIME_PORT"
-AUTH="admin:admin"
+AUTH="admin:magicops-admin"
 PASS_COUNT=0
 FAIL_COUNT=0
 
