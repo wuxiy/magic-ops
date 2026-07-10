@@ -1,0 +1,69 @@
+-- MagicOps 元数据库初始 schema
+-- 脚本生命周期和元数据模型（切片 1）
+
+CREATE TABLE scripts (
+    id              BIGINT AUTO_INCREMENT PRIMARY KEY,
+    name            VARCHAR(100)    NOT NULL UNIQUE,
+    project_code    VARCHAR(50),
+    script_type     VARCHAR(30)     NOT NULL,
+    status          VARCHAR(30)     NOT NULL,
+    current_version_id BIGINT,
+    created_by      VARCHAR(100)    NOT NULL,
+    created_at      TIMESTAMP       NOT NULL,
+    updated_at      TIMESTAMP       NOT NULL
+);
+
+CREATE TABLE script_drafts (
+    id              BIGINT AUTO_INCREMENT PRIMARY KEY,
+    script_id       BIGINT          NOT NULL,
+    content         TEXT,
+    route_path      VARCHAR(500),
+    route_method    VARCHAR(10),
+    created_at      TIMESTAMP       NOT NULL,
+    updated_at      TIMESTAMP       NOT NULL
+);
+
+CREATE TABLE script_versions (
+    id                  BIGINT AUTO_INCREMENT PRIMARY KEY,
+    script_id           BIGINT          NOT NULL,
+    version             VARCHAR(20)     NOT NULL,
+    content             TEXT            NOT NULL,
+    route_path          VARCHAR(500)    NOT NULL,
+    route_method        VARCHAR(10)     NOT NULL,
+    risk_level          VARCHAR(20)     NOT NULL,
+    resource_declaration TEXT,
+    content_hash        VARCHAR(64),
+    created_at          TIMESTAMP       NOT NULL
+);
+
+CREATE TABLE approvals (
+    id                  BIGINT AUTO_INCREMENT PRIMARY KEY,
+    script_version_id   BIGINT          NOT NULL,
+    submitted_by        VARCHAR(100)    NOT NULL,
+    decided_by          VARCHAR(100),
+    decision            VARCHAR(20),
+    comment             VARCHAR(2000),
+    submitted_at        TIMESTAMP       NOT NULL,
+    decided_at          TIMESTAMP
+);
+
+-- 审计记录表（后续切片接入持久化时使用）
+CREATE TABLE audit_records (
+    id              BIGINT AUTO_INCREMENT PRIMARY KEY,
+    trace_id        VARCHAR(100),
+    event_type      VARCHAR(50)     NOT NULL,
+    entity_type     VARCHAR(50)     NOT NULL,
+    entity_id       VARCHAR(100)    NOT NULL,
+    operator        VARCHAR(100),
+    event_timestamp TIMESTAMP       NOT NULL,
+    critical        BOOLEAN         NOT NULL DEFAULT FALSE,
+    details         TEXT
+);
+
+CREATE INDEX idx_scripts_status ON scripts(status);
+CREATE INDEX idx_scripts_project ON scripts(project_code);
+CREATE INDEX idx_drafts_script ON script_drafts(script_id);
+CREATE INDEX idx_versions_script ON script_versions(script_id);
+CREATE INDEX idx_approvals_version ON approvals(script_version_id);
+CREATE INDEX idx_audit_entity ON audit_records(entity_type, entity_id);
+CREATE INDEX idx_audit_event ON audit_records(event_type);

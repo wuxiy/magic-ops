@@ -11,7 +11,7 @@
 - 项目名称：MagicOps
 - 产品类型：医卫/政务内网动态开发、集成运维、数据修复和 Java 诊断平台
 - 主要用户：项目开发、实施工程师、运维工程师、技术审批人、安全审计员
-- 文档新鲜度：`partially fresh`
+- 文档新鲜度：`fresh`
 
 当前可信部分：
 
@@ -19,19 +19,18 @@
 - Console 到 Runtime 在线推送发布决策；
 - 平台持有签名私钥决策；
 - 动态 API 与数据修复共用脚本生命周期决策；
-- Arthas 第二阶段定位。
+- Arthas 第二阶段定位；
+- Maven 多模块脚手架和构建/验证命令。
 
 仍不完整或尚未验证：
 
 - fork 后的具体代码结构；
-- 构建命令；
-- 验证命令；
 - 数据库 schema 来源；
 - Runtime API 契约。
 
 ## 当前技术基线
 
-- 当前仓库状态：文档先行；产品代码尚未脚手架化。
+- 当前仓库状态：脚手架已完成，Maven 多模块项目已建立，Console 和 Runtime 可独立启动。
 - 后端目标栈：Java、Spring Boot、magic-api fork、PostgreSQL、Spring Security。
 - 前端/编辑器目标栈：第一阶段复用或扩展 `magic-editor`，后续再评估 UI 重写。
 - 数据库/模型来源：尚未创建；未来 schema/model 文件将成为数据库事实源。
@@ -40,17 +39,18 @@
 
 ## 验证命令
 
-在项目脚手架存在前，以下都是占位符。命令仍为占位符时，不要声称构建或测试验证成功。
-
 | 目的 | 命令 |
 |---|---|
-| 安装依赖 | `TBD after project scaffold` |
-| 本地运行 | `TBD after project scaffold` |
-| 编译检查 | `TBD after project scaffold` |
-| 构建 | `TBD after project scaffold` |
-| Lint / 静态检查 | `TBD after project scaffold` |
-| 单元测试 | `TBD after project scaffold` |
-| 集成测试 | `TBD after project scaffold` |
+| 安装依赖并编译 | `mvn compile` |
+| 安装到本地仓库 | `mvn install -DskipTests` |
+| 编译检查 | `mvn compile` |
+| 构建（含打包） | `mvn package -DskipTests` |
+| 单元测试 | `mvn test` |
+| 集成测试 | `mvn verify`（集成测试待补充） |
+| Console 本地启动 | `java -jar magicops-console/target/magicops-console-0.1.0-SNAPSHOT.jar` |
+| Runtime 本地启动 | `java -jar magicops-runtime/target/magicops-runtime-0.1.0-SNAPSHOT.jar` |
+
+Console 默认端口 8080，Runtime 默认端口 8081。启动后可通过 HTTP Basic 认证访问。
 
 ## 当前启用的可选层
 

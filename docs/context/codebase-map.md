@@ -2,14 +2,24 @@
 
 ## 当前状态
 
-MagicOps 当前是文档先行仓库，产品代码尚未脚手架化。
+MagicOps 脚手架已完成，Maven 多模块项目已建立。
 
 现有文件：
 
 - `README.md` - 仓库入口。
+- `AGENTS.md` - AI/Agent 工作规则。
+- `pom.xml` - Maven 多模块父 POM（Spring Boot 3.3.5，JDK 21）。
 - `docs/` - 长期项目记忆。
-- `magicops-project-doc.md` - 指向 AGE 文档的旧入口。
-- `magicops-architecture.md` - 指向 AGE 文档的旧入口。
+- `magic-api-source/` - magic-api 上游代码（git subtree，暂不参与主构建）。
+- `magicops-core/` - 共享核心模块。
+- `magicops-governance/` - 治理模块（审批、状态机）。
+- `magicops-audit/` - 审计模块。
+- `magicops-sign/` - 签名/验签模块。
+- `magicops-sql-guard/` - SQL 守卫模块。
+- `magicops-http/` - HTTP 目标适配模块。
+- `magicops-crypto/` - 加解密模块。
+- `magicops-console/` - Console Spring Boot 应用（端口 8080）。
+- `magicops-runtime/` - Runtime Spring Boot 应用（端口 8081）。
 
 ## 第一阶段目标仓库结构
 
