@@ -39,6 +39,7 @@
         <module>magicops-console</module>
         <module>magicops-runtime</module>
         <module>magicops-diagnosis</module>
+        <module>magicops-examples</module>
     </modules>
 
     <dependencyManagement>

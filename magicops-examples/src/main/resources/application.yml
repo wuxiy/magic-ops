@@ -1,0 +1,51 @@
+server:
+  port: 9999
+
+spring:
+  application:
+    name: magicops-examples
+  datasource:
+    url: jdbc:h2:mem:magicops_examples;DB_CLOSE_DELAY=-1;MODE=PostgreSQL
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+  sql:
+    init:
+      mode: always
+      schema-locations: classpath:schema.sql
+      data-locations: classpath:data.sql
+
+# magic-api 配置
+magic-api:
+  # Web 编辑器 UI 路径
+  web: /magic/web
+  # API 路径前缀
+  prefix: /api
+  # 资源存储：数据库模式（通过 Web 编辑器动态管理 API）
+  resource:
+    type: database
+    table-name: magic_api_file
+  # 启动 banner
+  banner: true
+  # 打印访问 URL
+  show-url: true
+  # 打印执行的 SQL
+  show-sql: true
+  # 编辑器登录凭据
+  security:
+    username: admin
+    password: admin123
+  # 分页配置
+  page:
+    page: page
+    size: size
+    default-size: 20
+
+logging:
+  level:
+    top.cywu.magicops: DEBUG
+    org.ssssssss: DEBUG
