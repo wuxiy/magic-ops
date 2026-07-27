@@ -44,13 +44,14 @@ export interface Approval {
 /** Audit log record */
 export interface AuditRecord {
   id: number
+  traceId: string
   entityType: string
   entityId: string
   eventType: string
   operator: string
-  timestamp: string
-  detail: string
-  ipAddress: string
+  eventTimestamp: string
+  critical: boolean
+  details: string
 }
 
 /** Key/certificate entry */

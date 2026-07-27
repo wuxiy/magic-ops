@@ -32,9 +32,8 @@
         <el-table-column prop="entityId" label="实体ID" width="120" />
         <el-table-column prop="eventType" label="事件类型" width="120" />
         <el-table-column prop="operator" label="操作人" width="120" />
-        <el-table-column prop="timestamp" label="时间" width="180" />
-        <el-table-column prop="detail" label="详情" min-width="200" show-overflow-tooltip />
-        <el-table-column prop="ipAddress" label="IP地址" width="140" />
+        <el-table-column prop="eventTimestamp" label="时间" width="200" />
+        <el-table-column prop="details" label="详情" min-width="200" show-overflow-tooltip />
       </el-table>
 
       <div class="pagination-wrap">

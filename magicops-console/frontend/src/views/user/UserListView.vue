@@ -110,7 +110,7 @@ import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus } from '@element-plus/icons-vue'
 import apiClient from '@/api/client'
-import type { User, PageResponse } from '@/types/api'
+import type { User } from '@/types/api'
 
 const loading = ref(false)
 const submitting = ref(false)
@@ -150,11 +150,12 @@ function showRoleDialog(user: User) {
 async function fetchData() {
   loading.value = true
   try {
-    const { data } = await apiClient.get<PageResponse<User>>('/users', {
+    const { data } = await apiClient.get<User[]>('/users', {
       params: { page: page.value - 1, size: pageSize.value },
     })
-    tableData.value = data.content
-    total.value = data.totalElements
+    const list = Array.isArray(data) ? data : []
+    tableData.value = list
+    total.value = list.length
   } catch {
     tableData.value = []
     total.value = 0
