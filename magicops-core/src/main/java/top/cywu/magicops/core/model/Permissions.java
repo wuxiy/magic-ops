@@ -35,6 +35,10 @@ public final class Permissions {
     // ---- 项目 ----
     public static final String PROJECT_MANAGE = "project:manage";
 
+    // ---- 诊断 ----
+    public static final String DIAGNOSIS_SESSION_CREATE = "diagnosis:session:create";
+    public static final String DIAGNOSIS_TEMPLATE_MANAGE = "diagnosis:template:manage";
+
     // ---- 管理 ----
     public static final String USER_MANAGE = "user:manage";
     public static final String ROLE_MANAGE = "role:manage";

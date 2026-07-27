@@ -25,13 +25,14 @@ import org.springframework.security.web.SecurityFilterChain;
 public class SecurityConfig {
 
     /**
-     * SPA 静态资源链：放行所有静态文件，SPA 路由由 Controller forward 处理。
+     * SPA 静态资源链：放行 Portal、Console、Diagnosis 静态文件和 magic-api 编辑器。
+     * magic-api 编辑器的认证由 SsoAuthorizationInterceptor 通过 SecurityContext 处理。
      */
     @Bean
     @Order(1)
     public SecurityFilterChain spaFilterChain(HttpSecurity http) throws Exception {
         http
-            .securityMatcher("/console/**", "/diagnosis/**")
+            .securityMatcher("/", "/favicon.ico", "/portal/**", "/console/**", "/diagnosis/**", "/magic/**")
             .csrf(csrf -> csrf.disable())
             .authorizeHttpRequests(auth -> auth
                 .anyRequest().permitAll()

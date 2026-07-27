@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MagicOps - 动态开发与运维平台</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+      --primary: #4f46e5;
+      --primary-light: #6366f1;
+      --bg: #0f172a;
+      --surface: #1e293b;
+      --surface-hover: #334155;
+      --text: #f1f5f9;
+      --text-muted: #94a3b8;
+      --border: #334155;
+      --success: #10b981;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans SC", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .header {
+      width: 100%;
+      padding: 20px 40px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border);
+    }
+    .logo {
+      font-size: 1.4rem;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+    }
+    .logo span { color: var(--primary-light); }
+    .user-info {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 0.9rem;
+      color: var(--text-muted);
+    }
+    .user-info .name { color: var(--text); font-weight: 500; }
+    .btn-logout {
+      padding: 6px 14px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: transparent;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 0.85rem;
+      transition: all 0.2s;
+    }
+    .btn-logout:hover { border-color: var(--danger); color: var(--danger); }
+
+    .main { width: 100%; max-width: 1100px; padding: 60px 40px; flex: 1; }
+
+    /* Hero */
+    .hero { text-align: center; margin-bottom: 60px; }
+    .hero h1 { font-size: 2.4rem; font-weight: 700; margin-bottom: 16px; letter-spacing: -1px; }
+    .hero h1 span { color: var(--primary-light); }
+    .hero p { font-size: 1.1rem; color: var(--text-muted); max-width: 640px; margin: 0 auto; line-height: 1.7; }
+
+    /* Features */
+    .features {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      margin-bottom: 60px;
+    }
+    .feature {
+      padding: 20px;
+      background: var(--surface);
+      border-radius: 10px;
+      border: 1px solid var(--border);
+    }
+    .feature h3 { font-size: 0.95rem; margin-bottom: 8px; color: var(--text); }
+    .feature p { font-size: 0.85rem; color: var(--text-muted); line-height: 1.6; }
+
+    /* Entry cards */
+    .entries { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
+    .entry-card {
+      display: block;
+      padding: 32px 28px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      text-decoration: none;
+      color: var(--text);
+      transition: all 0.25s;
+      position: relative;
+      overflow: hidden;
+    }
+    .entry-card:hover {
+      border-color: var(--primary-light);
+      transform: translateY(-3px);
+      box-shadow: 0 12px 40px rgba(79, 70, 229, 0.15);
+    }
+    .entry-card .icon {
+      width: 48px; height: 48px;
+      border-radius: 12px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.5rem;
+      margin-bottom: 18px;
+    }
+    .entry-card:nth-child(1) .icon { background: rgba(79, 70, 229, 0.15); }
+    .entry-card:nth-child(2) .icon { background: rgba(16, 185, 129, 0.15); }
+    .entry-card:nth-child(3) .icon { background: rgba(245, 158, 11, 0.15); }
+    .entry-card h2 { font-size: 1.15rem; margin-bottom: 10px; font-weight: 600; }
+    .entry-card p { font-size: 0.88rem; color: var(--text-muted); line-height: 1.6; }
+    .entry-card .arrow {
+      position: absolute;
+      top: 28px; right: 24px;
+      color: var(--text-muted);
+      opacity: 0;
+      transition: all 0.25s;
+    }
+    .entry-card:hover .arrow { opacity: 1; transform: translateX(3px); }
+
+    /* Login */
+    .login-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.85);
+      backdrop-filter: blur(8px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+    }
+    .login-box {
+      width: 380px;
+      padding: 40px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+    }
+    .login-box h2 { font-size: 1.3rem; margin-bottom: 8px; text-align: center; }
+    .login-box .subtitle {
+      text-align: center;
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      margin-bottom: 28px;
+    }
+    .form-group { margin-bottom: 18px; }
+    .form-group label {
+      display: block;
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+    }
+    .form-group input {
+      width: 100%;
+      padding: 11px 14px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--bg);
+      color: var(--text);
+      font-size: 0.95rem;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .form-group input:focus { border-color: var(--primary-light); }
+    .btn-login {
+      width: 100%;
+      padding: 12px;
+      border: none;
+      border-radius: 8px;
+      background: var(--primary);
+      color: #fff;
+      font-size: 0.95rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.2s;
+      margin-top: 6px;
+    }
+    .btn-login:hover { background: var(--primary-light); }
+    .btn-login:disabled { opacity: 0.6; cursor: not-allowed; }
+    .login-error {
+      color: var(--danger);
+      font-size: 0.83rem;
+      text-align: center;
+      margin-top: 12px;
+      min-height: 20px;
+    }
+
+    .hidden { display: none !important; }
+
+    .footer {
+      width: 100%;
+      padding: 20px 40px;
+      text-align: center;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      border-top: 1px solid var(--border);
+    }
+
+    @media (max-width: 768px) {
+      .features, .entries { grid-template-columns: 1fr; }
+      .hero h1 { font-size: 1.8rem; }
+      .main { padding: 40px 20px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="logo">Magic<span>Ops</span></div>
+    <div class="user-info hidden" id="userInfo">
+      <span class="name" id="userName"></span>
+      <span id="userRole"></span>
+      <button class="btn-logout" onclick="logout()">退出</button>
+    </div>
+  </div>
+
+  <div class="main">
+    <div class="hero">
+      <h1>医卫/政务内网<span>动态开发与运维</span>平台</h1>
+      <p>基于 magic-api 构建，提供动态查询接口、受控数据修复、HTTP 接口适配和 Arthas 线上诊断能力。全生命周期管控，从脚本编辑到审批发布，安全可审计。</p>
+    </div>
+
+    <div class="features">
+      <div class="feature">
+        <h3>动态接口引擎</h3>
+        <p>可视化编写 API 脚本，支持 SQL 查询、数据修复和 HTTP 适配，无需重新部署即可上线接口。</p>
+      </div>
+      <div class="feature">
+        <h3>全生命周期管控</h3>
+        <p>草稿 → 审批 → 签名 → 发布 → 回滚，12 态状态机驱动，RBAC 7 角色 × 17 权限精细控制。</p>
+      </div>
+      <div class="feature">
+        <h3>安全与审计</h3>
+        <p>AES-GCM / SM4 国密加密，SHA256+RSA 签名验证，全操作审计留痕，敏感数据自动脱敏。</p>
+      </div>
+    </div>
+
+    <div class="entries">
+      <a class="entry-card" href="/magic/web/">
+        <div class="icon">&#9998;</div>
+        <span class="arrow">&#8594;</span>
+        <h2>脚本编辑器</h2>
+        <p>基于 magic-editor 的可视化 API 编辑环境，支持在线编写、调试和测试动态接口脚本。</p>
+      </a>
+      <a class="entry-card" href="/console/">
+        <div class="icon">&#9881;</div>
+        <span class="arrow">&#8594;</span>
+        <h2>管理控制台</h2>
+        <p>用户管理、审批流程、发布历史、密钥配置和审计日志查询，平台运营一站式管理。</p>
+      </a>
+      <a class="entry-card" href="/diagnosis/">
+        <div class="icon">&#9889;</div>
+        <span class="arrow">&#8594;</span>
+        <h2>诊断中心</h2>
+        <p>Arthas 线上 Java 诊断终端，支持会话管理、命令模板、实时输出流和安全管控。</p>
+      </a>
+    </div>
+  </div>
+
+  <div class="footer">MagicOps v0.1.0 &middot; 内网动态开发与运维平台</div>
+
+  <!-- Login overlay -->
+  <div class="login-overlay" id="loginOverlay">
+    <div class="login-box">
+      <h2>登录 MagicOps</h2>
+      <p class="subtitle">一次登录，畅行三端</p>
+      <div class="form-group">
+        <label>用户名</label>
+        <input type="text" id="username" autocomplete="username" placeholder="admin">
+      </div>
+      <div class="form-group">
+        <label>密码</label>
+        <input type="password" id="password" autocomplete="current-password" placeholder="&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;">
+      </div>
+      <button class="btn-login" id="btnLogin" onclick="doLogin()">登 录</button>
+      <div class="login-error" id="loginError"></div>
+    </div>
+  </div>
+
+  <script>
+    const API = '/api';
+
+    async function checkSession() {
+      try {
+        const res = await fetch(API + '/me', { credentials: 'same-origin' });
+        if (res.ok) {
+          const data = await res.json();
+          showAuthenticated(data);
+          return true;
+        }
+      } catch (e) { /* not logged in */ }
+      showLogin();
+      return false;
+    }
+
+    function showAuthenticated(user) {
+      document.getElementById('loginOverlay').classList.add('hidden');
+      document.getElementById('userInfo').classList.remove('hidden');
+      document.getElementById('userName').textContent = user.displayName || user.username;
+      const roles = (user.authorities || []).filter(a => a.startsWith('ROLE_'));
+      document.getElementById('userRole').textContent = roles.length ? roles[0].replace('ROLE_', '') : '';
+    }
+
+    function showLogin() {
+      document.getElementById('loginOverlay').classList.remove('hidden');
+      document.getElementById('userInfo').classList.add('hidden');
+    }
+
+    async function doLogin() {
+      const username = document.getElementById('username').value.trim();
+      const password = document.getElementById('password').value;
+      const errEl = document.getElementById('loginError');
+      const btn = document.getElementById('btnLogin');
+
+      if (!username || !password) {
+        errEl.textContent = '请输入用户名和密码';
+        return;
+      }
+
+      btn.disabled = true;
+      errEl.textContent = '';
+
+      try {
+        const res = await fetch(API + '/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'same-origin',
+          body: JSON.stringify({ username, password })
+        });
+        const data = await res.json();
+        if (res.ok) {
+          showAuthenticated(data);
+        } else {
+          errEl.textContent = data.error || data.message || '登录失败';
+        }
+      } catch (e) {
+        errEl.textContent = '网络错误，请重试';
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    async function logout() {
+      try {
+        await fetch(API + '/logout', { method: 'POST', credentials: 'same-origin' });
+      } catch (e) { /* ignore */ }
+      showLogin();
+    }
+
+    // Enter key to submit
+    document.getElementById('password').addEventListener('keydown', e => {
+      if (e.key === 'Enter') doLogin();
+    });
+    document.getElementById('username').addEventListener('keydown', e => {
+      if (e.key === 'Enter') document.getElementById('password').focus();
+    });
+
+    // Init
+    checkSession();
+  </script>
+</body>
+</html>

@@ -36,7 +36,7 @@ import { ElMessage } from 'element-plus'
 import apiClient from '@/api/client'
 import type { CommandTemplate } from '@/types/diagnosis'
 
-const props = defineProps<{
+defineProps<{
   modelValue: CommandTemplate | null
 }>()
 

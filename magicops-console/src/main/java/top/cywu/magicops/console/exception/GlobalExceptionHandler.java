@@ -7,6 +7,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 import top.cywu.magicops.governance.lifecycle.IllegalStateTransitionException;
 
 import java.time.Instant;
@@ -42,6 +43,12 @@ public class GlobalExceptionHandler {
                 .collect(Collectors.joining(", "));
         return ResponseEntity.badRequest()
                 .body(Map.of("error", "Bad Request", "message", message, "timestamp", Instant.now().toString()));
+    }
+
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<Map<String, Object>> handleNoResource(NoResourceFoundException ex) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(Map.of("error", "Not Found", "message", ex.getMessage(), "timestamp", Instant.now().toString()));
     }
 
     @ExceptionHandler(Exception.class)

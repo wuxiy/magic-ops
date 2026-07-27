@@ -23,6 +23,19 @@ spring:
       enabled: true
       path: /h2-console
 
+# magic-api 编辑器配置（Web UI 由本应用提供，认证走 SSO）
+magic-api:
+  web: /magic/web
+  prefix: /magic-api
+  resource:
+    type: database
+    tableName: magic_api_file
+  banner: false
+  show-sql: false
+  security:
+    username:
+    password:
+
 logging:
   level:
     top.cywu.magicops: DEBUG

@@ -10,7 +10,7 @@ import { WebLinksAddon } from '@xterm/addon-web-links'
 import '@xterm/xterm/css/xterm.css'
 import { useWebSocket, type WsStatus } from '@/composables/useWebSocket'
 
-const props = defineProps<{
+defineProps<{
   sessionId: string | null
 }>()
 

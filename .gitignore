@@ -18,3 +18,12 @@ Thumbs.db
 
 # Environment
 .env
+
+# Frontend dependencies
+node_modules/
+
+# Built frontend bundles (regenerated via `npm run build`)
+magicops-console/src/main/resources/static/console/
+magicops-console/src/main/resources/static/diagnosis/
+magicops-examples/src/main/resources/static/console/
+magicops-examples/src/main/resources/static/diagnosis/
