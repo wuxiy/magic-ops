@@ -1,0 +1,33 @@
+/* MagicOps Console 全局样式
+ * 1) Element Plus token 覆盖(WCAG AA 对比度)
+ * 2) 列表页共享布局类(卡片头 / 分页)
+ */
+
+:root {
+  /* 默认 placeholder #a8abb2 在白底仅 ~2.3:1,提升至 AA(≥4.5:1) */
+  --el-text-color-placeholder: #6f7379;
+}
+
+/* 页面标题(各列表页卡片头中的 h1) */
+.page-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--el-text-color-primary);
+}
+
+/* 卡片头:标题在左,操作区在右 */
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+/* 表格右上分页 */
+.pagination-wrap {
+  margin-top: 16px;
+  display: flex;
+  justify-content: flex-end;
+}

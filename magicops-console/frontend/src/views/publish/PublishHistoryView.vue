@@ -3,7 +3,7 @@
     <el-card>
       <template #header>
         <div class="card-header">
-          <span>发布历史</span>
+          <h1 class="page-title">发布历史</h1>
         </div>
       </template>
 
@@ -88,8 +88,7 @@ async function fetchData() {
     tableData.value = data.content
     total.value = data.totalElements
   } catch {
-    tableData.value = []
-    total.value = 0
+    // 请求失败:保留当前数据,错误提示由响应拦截器统一展示
   } finally {
     loading.value = false
   }
@@ -98,15 +97,3 @@ async function fetchData() {
 onMounted(fetchData)
 </script>
 
-<style scoped>
-.card-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-.pagination-wrap {
-  margin-top: 16px;
-  display: flex;
-  justify-content: flex-end;
-}
-</style>

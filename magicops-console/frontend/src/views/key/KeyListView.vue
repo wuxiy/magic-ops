@@ -3,7 +3,7 @@
     <el-card>
       <template #header>
         <div class="card-header">
-          <span>密钥管理</span>
+          <h1 class="page-title">密钥管理</h1>
           <el-button type="primary" :loading="rotating" @click="rotateKey">
             <el-icon><Refresh /></el-icon>
             轮换密钥
@@ -32,7 +32,7 @@
               v-if="row.status === 'DEPRECATED'"
               size="small"
               type="danger"
-              @click="removeKey(row)"
+              @click="removeKey(row as KeyRow)"
             >删除</el-button>
             <span v-else class="muted">—</span>
           </template>
@@ -80,8 +80,10 @@ function statusLabel(status: string) {
   return map[status] ?? status
 }
 
-function tagType(status: string) {
-  const map: Record<string, string> = { ACTIVE: 'success', DEPRECATED: 'warning', UNKNOWN: 'info' }
+type TagType = 'primary' | 'success' | 'warning' | 'info' | 'danger'
+
+function tagType(status: string): TagType {
+  const map: Record<string, TagType> = { ACTIVE: 'success', DEPRECATED: 'warning', UNKNOWN: 'info' }
   return map[status] ?? 'info'
 }
 
@@ -91,7 +93,7 @@ async function fetchData() {
     const { data } = await apiClient.get<KeySummary>('/keys')
     summary.value = data
   } catch {
-    summary.value = { activeKeyId: null, allKeyIds: [], deprecatedKeyIds: [] }
+    // 请求失败:保留当前数据,错误提示由响应拦截器统一展示
   } finally {
     loading.value = false
   }
@@ -113,7 +115,7 @@ async function rotateKey() {
     ElMessage.success(`密钥已轮换，新密钥：${data.newKeyId}`)
     fetchData()
   } catch {
-    ElMessage.error('轮换失败')
+    // 错误提示由响应拦截器统一展示
   } finally {
     rotating.value = false
   }
@@ -134,7 +136,7 @@ async function removeKey(row: KeyRow) {
     ElMessage.success('密钥已删除')
     fetchData()
   } catch {
-    ElMessage.error('删除失败')
+    // 错误提示由响应拦截器统一展示
   }
 }
 
@@ -142,12 +144,7 @@ onMounted(fetchData)
 </script>
 
 <style scoped>
-.card-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
 .muted {
-  color: var(--el-text-color-placeholder);
+  color: var(--el-text-color-secondary);
 }
 </style>

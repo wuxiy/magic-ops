@@ -15,16 +15,31 @@ export interface LoginResponse {
   expiresIn: number
 }
 
-/** User entity */
-export interface User {
-  id: number
+/** 当前登录用户(来自 /api/login 与 /api/me 的 authorities) */
+export interface CurrentUser {
   username: string
   displayName: string
-  role: string
-  enabled: boolean
+  roles: string[]
   permissions: string[]
+}
+
+/** 用户管理列表项(对应后端 UserResponse) */
+export interface ManagedUser {
+  id: number
+  username: string
+  displayName: string | null
+  email: string | null
+  enabled: boolean
+  locked: boolean
   createdAt: string
-  updatedAt: string
+}
+
+/** 角色(对应后端 RoleEntity) */
+export interface Role {
+  id: number
+  name: string
+  displayName: string | null
+  description: string | null
 }
 
 /** Approval record */

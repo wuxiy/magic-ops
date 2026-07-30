@@ -15,6 +15,7 @@
           <el-input
             v-model="form.username"
             placeholder="用户名"
+            aria-label="用户名"
             :prefix-icon="User"
             size="large"
           />
@@ -24,19 +25,19 @@
             v-model="form.password"
             type="password"
             placeholder="密码"
+            aria-label="密码"
             :prefix-icon="Lock"
             size="large"
             show-password
-            @keyup.enter="handleLogin"
           />
         </el-form-item>
         <el-form-item>
           <el-button
             type="primary"
             size="large"
+            native-type="submit"
             :loading="loading"
             style="width: 100%"
-            @click="handleLogin"
           >
             登 录
           </el-button>
@@ -71,6 +72,7 @@ const rules: FormRules = {
 }
 
 async function handleLogin() {
+  if (loading.value) return
   const valid = await formRef.value?.validate().catch(() => false)
   if (!valid) return
 
@@ -81,7 +83,7 @@ async function handleLogin() {
     router.push(redirect)
     ElMessage.success('登录成功')
   } catch {
-    ElMessage.error('用户名或密码错误')
+    // 错误提示由响应拦截器统一展示(后端返回"用户名或密码错误")
   } finally {
     loading.value = false
   }
@@ -94,15 +96,15 @@ async function handleLogin() {
   justify-content: center;
   align-items: center;
   min-height: 100vh;
-  background: #f0f2f5;
+  background: var(--el-bg-color-page);
 }
 .login-card {
-  width: 400px;
+  width: min(400px, calc(100vw - 32px));
 }
 .login-title {
   text-align: center;
   margin: 0;
   font-size: 20px;
-  color: #303133;
+  color: var(--el-text-color-primary);
 }
 </style>

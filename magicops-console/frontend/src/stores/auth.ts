@@ -1,41 +1,40 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import apiClient from '@/api/client'
-import type { User } from '@/types/api'
+import type { CurrentUser } from '@/types/api'
 
-interface LoginResult {
+interface AuthResult {
   username: string
   authorities: string[]
-  message: string
+}
+
+function toCurrentUser(data: AuthResult): CurrentUser {
+  const authorities = data.authorities || []
+  return {
+    username: data.username,
+    displayName: data.username,
+    roles: authorities.filter(a => a.startsWith('ROLE_')).map(a => a.replace('ROLE_', '')),
+    permissions: authorities.filter(a => !a.startsWith('ROLE_')),
+  }
 }
 
 export const useAuthStore = defineStore('auth', () => {
-  const currentUser = ref<User | null>(null)
+  const currentUser = ref<CurrentUser | null>(null)
   const authenticated = ref(false)
 
   const isAuthenticated = computed(() => authenticated.value)
   const permissions = computed(() => currentUser.value?.permissions ?? [])
 
   async function login(username: string, password: string) {
-    const { data } = await apiClient.post<LoginResult>('/login', { username, password })
+    const { data } = await apiClient.post<AuthResult>('/login', { username, password })
+    currentUser.value = toCurrentUser(data)
     authenticated.value = true
-    // Build a minimal User object from login response
-    currentUser.value = {
-      id: 0,
-      username: data.username,
-      displayName: data.username,
-      role: (data.authorities || []).find(a => a.startsWith('ROLE_'))?.replace('ROLE_', '') ?? '',
-      enabled: true,
-      permissions: (data.authorities || []).filter(a => !a.startsWith('ROLE_')),
-      createdAt: '',
-      updatedAt: '',
-    }
   }
 
   async function fetchCurrentUser() {
     try {
-      const { data } = await apiClient.get<User>('/me')
-      currentUser.value = data
+      const { data } = await apiClient.get<AuthResult>('/me', { skipErrorMessage: true })
+      currentUser.value = toCurrentUser(data)
       authenticated.value = true
     } catch {
       authenticated.value = false
@@ -45,7 +44,7 @@ export const useAuthStore = defineStore('auth', () => {
 
   async function logout() {
     try {
-      await apiClient.post('/logout')
+      await apiClient.post('/logout', null, { skipErrorMessage: true })
     } finally {
       authenticated.value = false
       currentUser.value = null

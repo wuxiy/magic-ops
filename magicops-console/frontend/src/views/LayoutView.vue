@@ -7,7 +7,7 @@
         router
         background-color="#304156"
         text-color="#bfcbd9"
-        active-text-color="#409eff"
+        active-text-color="#79bbff"
       >
         <el-menu-item index="/approval">
           <el-icon><Stamp /></el-icon>
@@ -101,13 +101,13 @@ async function handleLogout() {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  border-bottom: 1px solid #e6e6e6;
-  background: #fff;
+  border-bottom: 1px solid var(--el-border-color-light);
+  background: var(--el-bg-color);
 }
 .header-title {
   font-size: 16px;
   font-weight: 600;
-  color: #303133;
+  color: var(--el-text-color-primary);
 }
 .header-right {
   display: flex;
@@ -115,10 +115,10 @@ async function handleLogout() {
   gap: 12px;
 }
 .user-name {
-  color: #606266;
+  color: var(--el-text-color-regular);
   font-size: 14px;
 }
 .layout-main {
-  background: #f0f2f5;
+  background: var(--el-bg-color-page);
 }
 </style>
