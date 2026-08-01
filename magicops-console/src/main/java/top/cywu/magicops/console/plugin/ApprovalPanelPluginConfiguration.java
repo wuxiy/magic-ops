@@ -1,18 +1,18 @@
 package top.cywu.magicops.console.plugin;
 
+import org.springframework.stereotype.Component;
 import org.ssssssss.magicapi.core.config.MagicPluginConfiguration;
 import org.ssssssss.magicapi.core.model.Plugin;
 
 /**
- * 审批状态面板插件。在 magic-editor 脚本工具栏中显示审批状态。
+ * 审批动态插件。在 magic-editor 资源右键菜单中提供「审批动态」面板。
  *
- * <p>前端插件 JS 负责在脚本编辑器底部面板显示审批时间线。
- * 后端通过 magic-api 的 MagicControllerRegister 注册查询端点。
- *
- * <p><b>当前已停用</b>：前端 IIFE bundle（magic-approval.1.0.0.iife.js）尚未构建，
- * 注册后编辑器会去 /magic/web/plugins/ 加载该脚本并返回 500。
- * 待切片 27 的插件前端实现完成后，重新加上 {@code @Component} 即可启用。
+ * <p>前端 IIFE bundle（magic-approval.1.0.0.iife.js）位于
+ * {@code classpath:/magicops-editor-plugins/}，由 {@link PluginResourceController}
+ * 以 {@code /magic/web/plugins/} 路径提供。面板通过同源 Session 调用
+ * {@code /api/approvals} 展示最近审批记录。
  */
+@Component
 public class ApprovalPanelPluginConfiguration implements MagicPluginConfiguration {
 
     @Override
