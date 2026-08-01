@@ -33,7 +33,7 @@ class DiagnosisServiceTest {
 
     @Test
     void createSession_succeeds() {
-        DiagnosisSession session = sessionManager.createSession("my-app", "10.0.0.1", 8080, 1L);
+        DiagnosisSession session = sessionManager.createSession("my-app", "10.0.0.1", 8080, "agent-1", 1L);
         assertNotNull(session);
         assertEquals(DiagnosisSession.SessionStatus.ACTIVE, session.status());
         assertEquals("my-app", session.targetApp());
@@ -42,14 +42,14 @@ class DiagnosisServiceTest {
 
     @Test
     void createSession_duplicateTarget_rejected() {
-        sessionManager.createSession("app1", "10.0.0.1", 8080, 1L);
+        sessionManager.createSession("app1", "10.0.0.1", 8080, "agent-1", 1L);
         assertThrows(IllegalStateException.class,
-                () -> sessionManager.createSession("app2", "10.0.0.1", 8080, 2L));
+                () -> sessionManager.createSession("app2", "10.0.0.1", 8080, "agent-2", 2L));
     }
 
     @Test
     void closeSession_succeeds() {
-        DiagnosisSession session = sessionManager.createSession("app1", "10.0.0.1", 8080, 1L);
+        DiagnosisSession session = sessionManager.createSession("app1", "10.0.0.1", 8080, "agent-1", 1L);
         DiagnosisSession closed = sessionManager.closeSession(session.id());
         assertEquals(DiagnosisSession.SessionStatus.CLOSED, closed.status());
         assertNotNull(closed.closedAt());
@@ -57,7 +57,7 @@ class DiagnosisServiceTest {
 
     @Test
     void closeSession_alreadyClosed_throws() {
-        DiagnosisSession session = sessionManager.createSession("app1", "10.0.0.1", 8080, 1L);
+        DiagnosisSession session = sessionManager.createSession("app1", "10.0.0.1", 8080, "agent-1", 1L);
         sessionManager.closeSession(session.id());
         assertThrows(IllegalStateException.class,
                 () -> sessionManager.closeSession(session.id()));
@@ -65,10 +65,10 @@ class DiagnosisServiceTest {
 
     @Test
     void closeSession_allowsNewSession_sameTarget() {
-        DiagnosisSession session = sessionManager.createSession("app1", "10.0.0.1", 8080, 1L);
+        DiagnosisSession session = sessionManager.createSession("app1", "10.0.0.1", 8080, "agent-1", 1L);
         sessionManager.closeSession(session.id());
         // 关闭后应允许在同一目标创建新会话
-        DiagnosisSession newSession = sessionManager.createSession("app1", "10.0.0.1", 8080, 1L);
+        DiagnosisSession newSession = sessionManager.createSession("app1", "10.0.0.1", 8080, "agent-1", 1L);
         assertNotNull(newSession);
     }
 

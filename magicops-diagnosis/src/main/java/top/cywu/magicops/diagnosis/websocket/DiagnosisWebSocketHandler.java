@@ -12,6 +12,8 @@ import top.cywu.magicops.diagnosis.model.DiagnosisSession;
 import top.cywu.magicops.diagnosis.service.CommandTemplateRegistry;
 import top.cywu.magicops.diagnosis.service.OutputMaskingService;
 import top.cywu.magicops.diagnosis.service.SessionManager;
+import top.cywu.magicops.diagnosis.service.TunnelClient;
+import top.cywu.magicops.diagnosis.service.TunnelResult;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -42,13 +44,16 @@ public class DiagnosisWebSocketHandler extends TextWebSocketHandler {
     private final SessionManager sessionManager;
     private final CommandTemplateRegistry templateRegistry;
     private final OutputMaskingService maskingService;
+    private final TunnelClient tunnelClient;
 
     public DiagnosisWebSocketHandler(SessionManager sessionManager,
                                      CommandTemplateRegistry templateRegistry,
-                                     OutputMaskingService maskingService) {
+                                     OutputMaskingService maskingService,
+                                     TunnelClient tunnelClient) {
         this.sessionManager = sessionManager;
         this.templateRegistry = templateRegistry;
         this.maskingService = maskingService;
+        this.tunnelClient = tunnelClient;
     }
 
     @Override
@@ -118,19 +123,30 @@ public class DiagnosisWebSocketHandler extends TextWebSocketHandler {
             // 解析命令参数
             String resolvedCommand = templateRegistry.resolve(template.id(), parsed.parameters);
 
-            // 模拟 Arthas 执行输出
-            String simulatedOutput = simulateExecution(resolvedCommand, template);
+            // 解析目标 Agent（经 Tunnel Server 路由）
+            String agentId = sessionManager.getSession(sessionId)
+                    .map(DiagnosisSession::agentId)
+                    .orElse(null);
 
-            // 脱敏处理
-            String maskedOutput = maskingService.mask(simulatedOutput);
+            // 先发送命令头，随后流式回传 Arthas 输出
+            session.sendMessage(new TextMessage("[" + template.name() + "] Resolved: " + resolvedCommand));
 
-            // 组装响应
-            StringBuilder response = new StringBuilder();
-            response.append("[").append(template.name()).append("] ")
-                    .append("Resolved: ").append(resolvedCommand).append("\n");
-            response.append(maskedOutput);
+            TunnelResult result = tunnelClient.execute(agentId, resolvedCommand, frame -> {
+                try {
+                    String masked = maskingService.mask(frame);
+                    synchronized (session) {
+                        if (session.isOpen()) {
+                            session.sendMessage(new TextMessage(masked));
+                        }
+                    }
+                } catch (Exception e) {
+                    log.warn("ws_stream_output_failed wsSessionId={}", session.getId(), e);
+                }
+            });
 
-            session.sendMessage(new TextMessage(response.toString()));
+            if (!result.success()) {
+                session.sendMessage(new TextMessage("ERROR: 命令执行失败: " + result.message()));
+            }
 
         } catch (IllegalArgumentException e) {
             session.sendMessage(new TextMessage("ERROR: " + e.getMessage()));
@@ -183,23 +199,6 @@ public class DiagnosisWebSocketHandler extends TextWebSocketHandler {
         }
 
         return new ParsedCommand(templateName, parameters);
-    }
-
-    /**
-     * 模拟 Arthas 命令执行输出。
-     * 实际场景中会通过 Tunnel Client 下发到目标 JVM 的 Arthas Agent。
-     */
-    private String simulateExecution(String resolvedCommand, CommandTemplate template) {
-        return "(模拟) Arthas 命令已下发到目标 JVM\n"
-                + "Command: " + resolvedCommand + "\n"
-                + "Risk Level: " + template.riskLevel() + "\n"
-                + "Status: EXECUTED\n"
-                + "---\n"
-                + "[模拟输出] thread 命令结果:\n"
-                + "ID     NAME                           GROUP      PRIORITY  STATE\n"
-                + "1      main                           main       5         RUNNABLE\n"
-                + "2      Reference Handler              system     10        WAITING\n"
-                + "3      Finalizer                      system     8         WAITING";
     }
 
     /**

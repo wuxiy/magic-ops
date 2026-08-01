@@ -57,11 +57,13 @@ class SchemaConsistencyTest {
     @Test
     void predefinedPermissionsExist() {
         long permissionCount = permissionRepository.count();
-        assertEquals(17, permissionCount, "应预置 17 种权限");
+        assertEquals(19, permissionCount, "应预置 19 种权限");
 
         assertTrue(permissionRepository.findByCode("script:create").isPresent(), "script:create 权限应存在");
         assertTrue(permissionRepository.findByCode("script:approve").isPresent(), "script:approve 权限应存在");
         assertTrue(permissionRepository.findByCode("audit:read").isPresent(), "audit:read 权限应存在");
+        assertTrue(permissionRepository.findByCode("diagnosis:session:create").isPresent(), "diagnosis:session:create 权限应存在");
+        assertTrue(permissionRepository.findByCode("diagnosis:template:manage").isPresent(), "diagnosis:template:manage 权限应存在");
     }
 
     @Test

@@ -9,6 +9,8 @@ import top.cywu.magicops.diagnosis.model.CommandTemplate.RiskLevel;
 import top.cywu.magicops.diagnosis.model.DiagnosisSession;
 import top.cywu.magicops.diagnosis.service.CommandTemplateRegistry;
 import top.cywu.magicops.diagnosis.service.SessionManager;
+import top.cywu.magicops.diagnosis.service.TunnelClient;
+import top.cywu.magicops.diagnosis.service.TunnelResult;
 
 import java.util.List;
 import java.util.Map;
@@ -22,11 +24,14 @@ public class DiagnosisController {
 
     private final SessionManager sessionManager;
     private final CommandTemplateRegistry templateRegistry;
+    private final TunnelClient tunnelClient;
 
     public DiagnosisController(SessionManager sessionManager,
-                               CommandTemplateRegistry templateRegistry) {
+                               CommandTemplateRegistry templateRegistry,
+                               TunnelClient tunnelClient) {
         this.sessionManager = sessionManager;
         this.templateRegistry = templateRegistry;
+        this.tunnelClient = tunnelClient;
     }
 
     // ---- 会话管理 ----
@@ -37,10 +42,11 @@ public class DiagnosisController {
         String targetApp = (String) request.get("targetApp");
         String targetHost = (String) request.get("targetHost");
         int targetPort = ((Number) request.getOrDefault("targetPort", 8080)).intValue();
+        String agentId = (String) request.get("agentId");
         Long operatorId = request.get("operatorId") != null
                 ? ((Number) request.get("operatorId")).longValue() : null;
 
-        DiagnosisSession session = sessionManager.createSession(targetApp, targetHost, targetPort, operatorId);
+        DiagnosisSession session = sessionManager.createSession(targetApp, targetHost, targetPort, agentId, operatorId);
         return ResponseEntity.status(HttpStatus.CREATED).body(session);
     }
 
@@ -109,12 +115,21 @@ public class DiagnosisController {
                     "riskLevel", template.riskLevel().name()));
         }
 
-        // 模拟执行（实际会通过 Tunnel Client 发送到 Arthas Agent）
-        return ResponseEntity.ok(Map.of(
-                "sessionId", sessionId,
-                "templateId", templateId,
-                "resolvedCommand", resolvedCommand,
-                "status", "EXECUTED",
-                "output", "（模拟输出）Arthas 命令已下发"));
+        // 经 Tunnel Client 下发到目标 Arthas Agent（REST 通道同步收集输出）
+        StringBuilder output = new StringBuilder();
+        TunnelResult result = tunnelClient.execute(session.agentId(), resolvedCommand, output::append);
+
+        Map<String, Object> response = new java.util.LinkedHashMap<>();
+        response.put("sessionId", sessionId);
+        response.put("templateId", templateId);
+        response.put("resolvedCommand", resolvedCommand);
+        response.put("status", result.success() ? result.message() : "FAILED");
+        response.put("simulated", result.simulated());
+        response.put("output", output.toString());
+        if (!result.success()) {
+            response.put("error", result.message());
+            return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body(response);
+        }
+        return ResponseEntity.ok(response);
     }
 }

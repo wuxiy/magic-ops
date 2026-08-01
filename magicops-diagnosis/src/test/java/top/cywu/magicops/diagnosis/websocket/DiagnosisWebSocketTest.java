@@ -4,9 +4,12 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import top.cywu.magicops.diagnosis.model.CommandTemplate;
 import top.cywu.magicops.diagnosis.model.CommandTemplate.RiskLevel;
+import top.cywu.magicops.diagnosis.config.TunnelProperties;
+import top.cywu.magicops.diagnosis.service.ArthasTunnelClient;
 import top.cywu.magicops.diagnosis.service.CommandTemplateRegistry;
 import top.cywu.magicops.diagnosis.service.OutputMaskingService;
 import top.cywu.magicops.diagnosis.service.SessionManager;
+import top.cywu.magicops.diagnosis.service.TunnelClient;
 
 import java.util.Map;
 
@@ -27,7 +30,8 @@ class DiagnosisWebSocketTest {
         sessionManager = new SessionManager();
         templateRegistry = new CommandTemplateRegistry();
         maskingService = new OutputMaskingService();
-        handler = new DiagnosisWebSocketHandler(sessionManager, templateRegistry, maskingService);
+        TunnelClient tunnelClient = new ArthasTunnelClient(new TunnelProperties());
+        handler = new DiagnosisWebSocketHandler(sessionManager, templateRegistry, maskingService, tunnelClient);
 
         // 注册测试模板
         templateRegistry.register("dashboard", "dashboard", null, RiskLevel.LOW, false, "面板");
@@ -113,14 +117,14 @@ class DiagnosisWebSocketTest {
 
     @Test
     void sessionManager_createAndRetrieve() {
-        var session = sessionManager.createSession("app1", "10.0.0.1", 8080, 1L);
+        var session = sessionManager.createSession("app1", "10.0.0.1", 8080, "agent-1", 1L);
         assertTrue(sessionManager.getSession(session.id()).isPresent());
     }
 
     @Test
     void sessionManager_duplicateTargetRejected() {
-        sessionManager.createSession("app1", "10.0.0.1", 8080, 1L);
+        sessionManager.createSession("app1", "10.0.0.1", 8080, "agent-1", 1L);
         assertThrows(IllegalStateException.class,
-                () -> sessionManager.createSession("app2", "10.0.0.1", 8080, 2L));
+                () -> sessionManager.createSession("app2", "10.0.0.1", 8080, "agent-2", 2L));
     }
 }

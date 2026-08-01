@@ -36,6 +36,19 @@ magic-api:
     username:
     password:
 
+# Arthas 诊断中心 Tunnel 配置
+# enabled=false 时诊断命令走模拟降级；接入真实 Arthas Tunnel Server 时启用并配置 server-url
+magicops:
+  diagnosis:
+    tunnel:
+      enabled: false
+      server-url: ws://localhost:7777/ws/client
+      client-name: magicops
+      auth-token:
+      connect-timeout-ms: 5000
+      command-timeout-ms: 30000
+      simulate-fallback: true
+
 logging:
   level:
     top.cywu.magicops: DEBUG

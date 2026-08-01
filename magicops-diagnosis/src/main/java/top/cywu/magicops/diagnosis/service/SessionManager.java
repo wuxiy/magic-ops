@@ -34,10 +34,11 @@ public class SessionManager {
     /**
      * 创建诊断会话。
      *
+     * @param agentId 目标 Arthas Agent 在 Tunnel Server 的标识；为空时按 targetApp 推导
      * @throws IllegalStateException 如果目标实例已有活跃会话
      */
     public DiagnosisSession createSession(String targetApp, String targetHost, int targetPort,
-                                          Long operatorId) {
+                                          String agentId, Long operatorId) {
         // 检查并发限制
         String targetKey = targetHost + ":" + targetPort;
         boolean hasActive = sessions.values().stream()
@@ -47,13 +48,18 @@ public class SessionManager {
             throw new IllegalStateException("目标实例已有活跃诊断会话: " + targetKey);
         }
 
+        String resolvedAgentId = (agentId != null && !agentId.isBlank())
+                ? agentId
+                : (targetApp != null && !targetApp.isBlank() ? targetApp : targetHost);
+
         long id = idGenerator.getAndIncrement();
         DiagnosisSession session = new DiagnosisSession(
-                id, targetApp, targetHost, targetPort, operatorId,
+                id, targetApp, targetHost, targetPort, resolvedAgentId, operatorId,
                 SessionStatus.ACTIVE, Instant.now(), null, DEFAULT_TIMEOUT_MINUTES);
         sessions.put(id, session);
 
-        log.info("session_created id={} target={}:{} operator={}", id, targetHost, targetPort, operatorId);
+        log.info("session_created id={} target={}:{} agentId={} operator={}",
+                id, targetHost, targetPort, resolvedAgentId, operatorId);
         return session;
     }
 
@@ -71,8 +77,8 @@ public class SessionManager {
 
         DiagnosisSession closed = new DiagnosisSession(
                 session.id(), session.targetApp(), session.targetHost(), session.targetPort(),
-                session.operatorId(), SessionStatus.CLOSED, session.createdAt(), Instant.now(),
-                session.timeoutMinutes());
+                session.agentId(), session.operatorId(), SessionStatus.CLOSED, session.createdAt(),
+                Instant.now(), session.timeoutMinutes());
         sessions.put(sessionId, closed);
 
         log.info("session_closed id={} durationMs={}", sessionId,
@@ -105,8 +111,8 @@ public class SessionManager {
                 if (elapsed.toMinutes() >= session.timeoutMinutes()) {
                     DiagnosisSession timedOut = new DiagnosisSession(
                             session.id(), session.targetApp(), session.targetHost(), session.targetPort(),
-                            session.operatorId(), SessionStatus.TIMEOUT, session.createdAt(), Instant.now(),
-                            session.timeoutMinutes());
+                            session.agentId(), session.operatorId(), SessionStatus.TIMEOUT, session.createdAt(),
+                            Instant.now(), session.timeoutMinutes());
                     sessions.put(session.id(), timedOut);
                     count++;
                     log.info("session_timeout id={}", session.id());
