@@ -1,0 +1,33 @@
+name: magicops-dev
+
+services:
+  console:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: magicops/console:0.1.0-dev
+    container_name: magicops-console
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      DB_HOST: medical-platform-keycloak-db-1
+      DB_PORT: "5432"
+      DB_NAME: magicops
+      DB_USERNAME: magicops
+      DB_PASSWORD: ${DB_PASSWORD:?请在 .env 中提供 DB_PASSWORD}
+      SERVER_PORT: "8080"
+    ports:
+      - "${MAGICOPS_PORT:-18080}:8080"
+    networks:
+      - platform-net
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/ > /dev/null 2>&1 || exit 1"]
+      interval: 15s
+      timeout: 5s
+      start_period: 45s
+      retries: 6
+    restart: unless-stopped
+
+networks:
+  platform-net:
+    external: true
+    name: medical-platform_platform-net
