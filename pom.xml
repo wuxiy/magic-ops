@@ -26,6 +26,7 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
         <magicops.version>0.1.0-SNAPSHOT</magicops.version>
+        <jsqlparser.version>4.9</jsqlparser.version>
     </properties>
 
     <modules>
@@ -84,6 +85,12 @@
                 <groupId>top.cywu</groupId>
                 <artifactId>magicops-diagnosis</artifactId>
                 <version>${magicops.version}</version>
+            </dependency>
+            <!-- SQL 解析器（SQL Guard AST 分类与表提取） -->
+            <dependency>
+                <groupId>com.github.jsqlparser</groupId>
+                <artifactId>jsqlparser</artifactId>
+                <version>${jsqlparser.version}</version>
             </dependency>
         </dependencies>
     </dependencyManagement>

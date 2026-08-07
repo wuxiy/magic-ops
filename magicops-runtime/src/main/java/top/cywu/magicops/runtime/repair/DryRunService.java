@@ -9,21 +9,18 @@ import top.cywu.magicops.sqlguard.model.SqlType;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 /**
  * Dry-run 服务。在执行数据修复前，分析 SQL 并估算影响范围。
  *
- * <p>第一版只做 SQL 解析、权限校验、危险语句拦截和影响范围估算。
+ * <p>切片 30 起：语句合法性与 WHERE 约束复用 {@link SqlGuardService#validateForRepair}
+ * （AST 级判断），表提取使用 {@link SqlGuardService#targetTables}，
+ * 不再使用正则与字符串包含检查。
  */
 @Service
 public class DryRunService {
 
     private static final Logger log = LoggerFactory.getLogger(DryRunService.class);
-
-    private static final Pattern TABLE_PATTERN = Pattern.compile(
-            "(?i)(?:UPDATE|INSERT\\s+INTO|DELETE\\s+FROM)\\s+(\\w+)", Pattern.CASE_INSENSITIVE);
 
     private final SqlGuardService sqlGuardService;
 
@@ -43,37 +40,25 @@ public class DryRunService {
             return DryRunReport.failure(scriptId, sql, "SQL 不能为空");
         }
 
-        // 1. SQL 分类
+        // 1. SQL 分类（AST）
         SqlType sqlType = sqlGuardService.classify(sql);
 
-        // 2. 检查是否为允许的修复类型
+        // 2. 复用 SQL Guard 的修复约束校验（类型 + WHERE + 单语句）
+        SqlGuardResult guardResult = sqlGuardService.validateForRepair(sql);
+        if (!guardResult.allowed()) {
+            return DryRunReport.failure(scriptId, sql, guardResult.reason());
+        }
+
+        // 3. 提取受影响的表（AST）
+        List<String> affectedTables = sqlGuardService.targetTables(sql);
+
+        // 4. 风险告警
         List<String> warnings = new ArrayList<>();
-        if (sqlType == SqlType.SELECT) {
-            return DryRunReport.failure(scriptId, sql, "数据修复不允许 SELECT 类型");
-        }
-        if (sqlType == SqlType.TRUNCATE || sqlType == SqlType.DROP
-                || sqlType == SqlType.ALTER || sqlType == SqlType.CREATE
-                || sqlType == SqlType.GRANT) {
-            return DryRunReport.failure(scriptId, sql,
-                    "数据修复不允许 " + sqlType + " 类型操作");
-        }
-
-        // 3. 提取受影响的表
-        List<String> affectedTables = extractTables(sql);
-
-        // 4. 检查 WHERE 条件
-        String upperSql = sql.toUpperCase().trim();
-        if ((sqlType == SqlType.UPDATE || sqlType == SqlType.DELETE) && !upperSql.contains("WHERE")) {
-            return DryRunReport.failure(scriptId, sql,
-                    sqlType + " 语句必须包含 WHERE 条件");
-        }
-
-        // 5. 检查自由 UPDATE/DELETE 限制
         if (sqlType == SqlType.UPDATE || sqlType == SqlType.DELETE) {
             warnings.add("该操作为 " + sqlType + "，将受 SQL Guard 约束执行");
         }
 
-        // 6. 估算影响行数（第一版基于简单规则）
+        // 5. 估算影响行数（第一版基于简单规则）
         int estimatedRows = estimateAffectedRows(sql, sqlType);
 
         log.info("dry_run scriptId={} type={} tables={} estimatedRows={}",
@@ -81,18 +66,6 @@ public class DryRunService {
 
         return DryRunReport.success(scriptId, sql, sqlType.name(),
                 estimatedRows, affectedTables, warnings);
-    }
-
-    /**
-     * 从 SQL 中提取受影响的表名。
-     */
-    private List<String> extractTables(String sql) {
-        List<String> tables = new ArrayList<>();
-        Matcher matcher = TABLE_PATTERN.matcher(sql);
-        while (matcher.find()) {
-            tables.add(matcher.group(1));
-        }
-        return tables;
     }
 
     /**

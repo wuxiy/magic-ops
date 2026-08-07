@@ -143,6 +143,58 @@ public class DynamicDataSourceManager {
         }
     }
 
+    /**
+     * Execute an UPDATE/INSERT/DELETE statement inside an explicit transaction,
+     * enforcing a maximum affected-row count. When the limit is exceeded the
+     * transaction is rolled back and a failure result is returned.
+     *
+     * <p>用于受控数据修复：影响行数超限必须回滚（切片 30）。
+     *
+     * @param dataSourceName  the data source to execute against
+     * @param sql             the UPDATE/INSERT/DELETE SQL
+     * @param params          statement parameters
+     * @param maxAffectedRows maximum allowed affected rows; exceeding triggers rollback
+     * @return update result; on limit breach success=false with rollback message
+     */
+    public QueryResult executeUpdateInTransaction(String dataSourceName, String sql,
+                                                  List<Object> params, int maxAffectedRows) {
+        DataSource ds = getDataSource(dataSourceName);
+        long startTime = System.currentTimeMillis();
+
+        try (Connection conn = ds.getConnection()) {
+            conn.setAutoCommit(false);
+            try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+                if (params != null) {
+                    for (int i = 0; i < params.size(); i++) {
+                        stmt.setObject(i + 1, params.get(i));
+                    }
+                }
+
+                int affectedRows = stmt.executeUpdate();
+                if (affectedRows > maxAffectedRows) {
+                    conn.rollback();
+                    long duration = System.currentTimeMillis() - startTime;
+                    log.warn("update_rolled_back affectedRows={} limit={}", affectedRows, maxAffectedRows);
+                    return new QueryResult(List.of(), affectedRows, duration, false,
+                            "影响行数 " + affectedRows + " 超过上限 " + maxAffectedRows + "，事务已回滚");
+                }
+
+                conn.commit();
+                long duration = System.currentTimeMillis() - startTime;
+                return new QueryResult(List.of(), affectedRows, duration, true, null);
+            } catch (Exception e) {
+                conn.rollback();
+                long duration = System.currentTimeMillis() - startTime;
+                log.error("Update execution failed and rolled back: {}", e.getMessage());
+                return new QueryResult(List.of(), 0, duration, false, e.getMessage());
+            }
+        } catch (Exception e) {
+            long duration = System.currentTimeMillis() - startTime;
+            log.error("Transactional update failed: {}", e.getMessage());
+            return new QueryResult(List.of(), 0, duration, false, e.getMessage());
+        }
+    }
+
     public record QueryResult(
             List<Map<String, Object>> rows,
             int rowCount,

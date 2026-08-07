@@ -37,6 +37,10 @@
         </dependency>
         <dependency>
             <groupId>top.cywu</groupId>
+            <artifactId>magicops-sql-guard</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>top.cywu</groupId>
             <artifactId>magicops-diagnosis</artifactId>
         </dependency>
         <!-- magic-api 编辑器（Web UI + 自动配置） -->

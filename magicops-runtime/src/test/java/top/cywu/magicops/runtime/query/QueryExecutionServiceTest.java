@@ -148,6 +148,92 @@ class QueryExecutionServiceTest {
         assertTrue(result.resultSize() <= 1000);
     }
 
+    // ---- 切片 30：表级白名单 ----
+
+    @Test
+    void executeQuery_tableNotInAllowlist_rejected() {
+        // 授权表为 orders，查询 patients 应被拒绝
+        PublishPackage pkg = buildPackageWithPermissions(
+                "SELECT * FROM patients", List.of("orders"));
+        String traceId = UUID.randomUUID().toString();
+
+        QueryExecutionResult result = queryService.executeQuery(pkg,
+                "SELECT * FROM patients", traceId);
+
+        assertFalse(result.success());
+        assertTrue(result.errorMessage().contains("授权范围"),
+                "表白名单应拒绝未授权表: " + result.errorMessage());
+    }
+
+    @Test
+    void executeQuery_tableInAllowlist_allowed() {
+        PublishPackage pkg = buildPackageWithPermissions(
+                "SELECT * FROM patients", List.of("patients"));
+        String traceId = UUID.randomUUID().toString();
+
+        QueryExecutionResult result = queryService.executeQuery(pkg,
+                "SELECT * FROM patients", traceId);
+
+        assertTrue(result.success(), "授权表应允许: " + result.errorMessage());
+        assertEquals(3, result.resultSize());
+    }
+
+    @Test
+    void executeQuery_legacyPackageNoPermissions_allowed() {
+        // 无 datasourcePermissions 的遗留包按告警放行
+        PublishPackage pkg = buildPackage("SELECT * FROM patients");
+        String traceId = UUID.randomUUID().toString();
+
+        QueryExecutionResult result = queryService.executeQuery(pkg,
+                "SELECT * FROM patients", traceId);
+
+        assertTrue(result.success(), "遗留包（无授权声明）应放行: " + result.errorMessage());
+    }
+
+    @Test
+    void executeQuery_subqueryUnauthorizedTable_rejected() {
+        // 子查询中引用未授权表也应被拒绝
+        PublishPackage pkg = buildPackageWithPermissions(
+                "SELECT * FROM patients", List.of("patients"));
+        String traceId = UUID.randomUUID().toString();
+
+        QueryExecutionResult result = queryService.executeQuery(pkg,
+                "SELECT * FROM patients WHERE id IN (SELECT pid FROM secret_audit)", traceId);
+
+        assertFalse(result.success());
+        assertTrue(result.errorMessage().contains("secret_audit"));
+    }
+
+    private PublishPackage buildPackageWithPermissions(String sql, List<String> allowedTables) {
+        byte[] normalizedScript = CanonicalJson.normalizeScript(sql);
+        String contentHash = signingService.sha256Hex(normalizedScript);
+
+        Map<String, Object> metadata = Map.of(
+                "routeMapping", List.of(),
+                "datasourcePermissions", List.of(
+                        Map.of("datasource", "default", "tables", allowedTables)));
+        String metadataHash = signingService.hashMetadata(metadata);
+        Map<String, Object> policy = Map.of();
+
+        PackageManifest manifest = new PackageManifest(
+                "test-project", "development", "1.0.0", "0.1.0",
+                "tester", Instant.now(), "test-key",
+                List.of(new PackageManifest.ScriptEntry(
+                        "script-001", "/api/test", "GET", "1.0.0",
+                        "DYNAMIC_QUERY", "LOW", contentHash, ""
+                )),
+                metadataHash,
+                signingService.sha256Hex(CanonicalJson.toCanonicalBytes(policy)),
+                "SHA256withRSA", null
+        );
+
+        Map<String, byte[]> scripts = Map.of("/api/test", normalizedScript);
+        byte[] signingInput = signingService.buildSigningInput(manifest, metadata, scripts);
+        byte[] signature = signingService.sign(signingInput, keyPair.getPrivate());
+
+        return new PublishPackage(manifest, scripts, metadata, policy, signature);
+    }
+
     private PublishPackage buildPackage(String sql) {
         byte[] normalizedScript = CanonicalJson.normalizeScript(sql);
         String contentHash = signingService.sha256Hex(normalizedScript);

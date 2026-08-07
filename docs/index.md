@@ -29,6 +29,7 @@
 | 理解第三阶段完善与 Arthas 计划 | `docs/plans/2026-07-11-0001-third-stage-refinement-and-arthas.md` | `docs/architecture/module-boundaries.md` |
 | 理解第四阶段加固与诊断实现 | `docs/plans/2026-07-11-0002-fourth-stage-hardening-and-diagnosis.md` | `docs/architecture/diagnosis-design.md` |
 | 理解混合 UI 架构计划 | `docs/plans/2026-07-11-0003-hybrid-ui-architecture.md` | `docs/architecture/system-baseline.md` |
+| 理解生产准入强制化计划（P0 门槛） | `docs/plans/2026-08-07-0000-fifth-stage-production-gate.md` | `docs/analysis/2026-08-07-production-readiness-gap-analysis.md` |
 | 理解产品行为和用户角色 | `docs/design/app-overview.md` | `docs/design/roles-and-permissions.md`, `docs/design/flow-overview.md` |
 | 理解术语和领域语言 | `docs/design/domain-glossary.md` | 相关设计或架构文档 |
 | 理解技术基线 | `docs/architecture/system-baseline.md` | `docs/architecture/module-boundaries.md` |

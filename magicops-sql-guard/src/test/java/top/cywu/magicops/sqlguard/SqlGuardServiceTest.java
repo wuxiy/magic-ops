@@ -7,6 +7,8 @@ import org.junit.jupiter.params.provider.ValueSource;
 import top.cywu.magicops.sqlguard.model.SqlGuardResult;
 import top.cywu.magicops.sqlguard.model.SqlType;
 
+import java.util.List;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
@@ -155,5 +157,111 @@ class SqlGuardServiceTest {
     void summarize_shortSqlUnchanged() {
         String sql = "SELECT 1";
         assertEquals(sql, sqlGuardService.summarize(sql));
+    }
+
+    // ---- AST 绕过抵抗（切片 30 加固）----
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "/* comment */ DROP TABLE users",
+            "DROP/**/TABLE users",
+            "   DROP TABLE users   ",
+            "drop table users"
+    })
+    void validate_rejectsObfuscatedDrop(String sql) {
+        SqlGuardResult result = sqlGuardService.validate(sql);
+        assertFalse(result.allowed(), "注释/空白变形不应绕过拦截: " + sql);
+    }
+
+    @Test
+    void validate_rejectsInlineCommentWrite() {
+        SqlGuardResult result = sqlGuardService.validate("SELECT 1; /* hide */ DELETE FROM users");
+        assertFalse(result.allowed());
+        assertTrue(result.reason().contains("多语句"));
+    }
+
+    @Test
+    void validate_allowsPlaceholderParam() {
+        // magic-api 占位符归一化后应为合法 SELECT
+        SqlGuardResult result = sqlGuardService.validate(
+                "SELECT id, name FROM patients WHERE id = #{id}");
+        assertTrue(result.allowed());
+        assertEquals(SqlType.SELECT, result.sqlType());
+    }
+
+    @Test
+    void validateForRepair_updateWithCommentWhere() {
+        SqlGuardResult result = sqlGuardService.validateForRepair(
+                "UPDATE /* c */ orders SET status='X' WHERE id = 1");
+        assertTrue(result.allowed());
+    }
+
+    @Test
+    void validateForRepair_rejectsCommentHiddenNoWhere() {
+        // WHERE 检查基于 AST，注释不能伪造 WHERE
+        SqlGuardResult result = sqlGuardService.validateForRepair(
+                "UPDATE orders SET status='X' /* WHERE id=1 */");
+        assertFalse(result.allowed());
+        assertTrue(result.reason().contains("WHERE"));
+    }
+
+    @Test
+    void classify_placeholderNormalized() {
+        assertEquals(SqlType.SELECT,
+                sqlGuardService.classify("SELECT * FROM t WHERE a = #{a} AND b = ${b}"));
+    }
+
+    // ---- 表提取（切片 30，表白名单基础）----
+
+    @Test
+    void tablesIn_simpleSelect() {
+        assertEquals(List.of("patients"),
+                sqlGuardService.tablesIn("SELECT * FROM patients WHERE id = 1"));
+    }
+
+    @Test
+    void tablesIn_joinAndSubquery() {
+        List<String> tables = sqlGuardService.tablesIn(
+                "SELECT a.id FROM orders a JOIN users b ON a.uid = b.id "
+                        + "WHERE a.id IN (SELECT oid FROM audit_log)");
+        assertEquals(List.of("audit_log", "orders", "users"), tables);
+    }
+
+    @Test
+    void tablesIn_cteExcluded() {
+        // CTE 名称不应被当作物理表
+        List<String> tables = sqlGuardService.tablesIn(
+                "WITH cte AS (SELECT id FROM patients) SELECT * FROM cte");
+        assertEquals(List.of("patients"), tables);
+    }
+
+    @Test
+    void tablesIn_unparseable_returnsEmpty() {
+        assertEquals(List.of(), sqlGuardService.tablesIn("NOT VALID SQL"));
+    }
+
+    @Test
+    void targetTables_update() {
+        assertEquals(List.of("orders"),
+                sqlGuardService.targetTables("UPDATE orders SET s='X' WHERE id = 1"));
+    }
+
+    @Test
+    void targetTables_deleteAndInsert() {
+        assertEquals(List.of("orders"),
+                sqlGuardService.targetTables("DELETE FROM orders WHERE id = 1"));
+        assertEquals(List.of("orders"),
+                sqlGuardService.targetTables("INSERT INTO orders (id) VALUES (9)"));
+    }
+
+    @Test
+    void targetTables_select_returnsEmpty() {
+        assertEquals(List.of(), sqlGuardService.targetTables("SELECT * FROM orders"));
+    }
+
+    @Test
+    void parseSingleStatement_rejectsMultiStatement() {
+        assertThrows(IllegalArgumentException.class,
+                () -> sqlGuardService.parseSingleStatement("SELECT 1; DROP TABLE users"));
     }
 }

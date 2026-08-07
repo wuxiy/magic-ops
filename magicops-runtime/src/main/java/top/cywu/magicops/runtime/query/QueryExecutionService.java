@@ -91,7 +91,16 @@ public class QueryExecutionService {
                 return result;
             }
 
-            // 2. 通过 DynamicDataSourceManager 执行查询
+            // 2. 表级白名单校验（切片 30）：SQL 引用的表必须在发布包授权范围内
+            String tableViolation = checkTablePermissions(pkg, sql);
+            if (tableViolation != null) {
+                QueryExecutionResult result = QueryExecutionResult.failure(
+                        traceId, scriptId, scriptVersion, sqlSummary, elapsed(startTime), tableViolation);
+                writeExecutionAudit(pkg, result);
+                return result;
+            }
+
+            // 3. 通过 DynamicDataSourceManager 执行查询
             DynamicDataSourceManager.QueryResult queryResult =
                     dataSourceManager.executeQuery(dataSourceName, sql, null, MAX_RESULT_ROWS);
 
@@ -102,13 +111,13 @@ public class QueryExecutionService {
                 return result;
             }
 
-            // 3. 结果大小已由 DynamicDataSourceManager 限制
+            // 4. 结果大小已由 DynamicDataSourceManager 限制
             int resultSize = queryResult.rowCount();
 
             QueryExecutionResult result = QueryExecutionResult.success(
                     traceId, scriptId, scriptVersion, sqlSummary, resultSize, elapsed(startTime));
 
-            // 4. 写入执行审计
+            // 5. 写入执行审计
             writeExecutionAudit(pkg, result);
 
             log.info("query_executed traceId={} scriptId={} resultSize={} durationMs={}",
@@ -121,6 +130,48 @@ public class QueryExecutionService {
             writeExecutionAudit(pkg, result);
             throw e;
         }
+    }
+
+    /**
+     * 校验 SQL 引用的表在发布包授权范围内（fail-closed）。
+     *
+     * <p>metadata 无 {@code datasourcePermissions} 时按遗留包放行并告警；
+     * 存在授权声明时严格校验。
+     *
+     * @return 违规说明；通过时返回 null
+     */
+    private String checkTablePermissions(PublishPackage pkg, String sql) {
+        Object permsObj = pkg.metadata() != null
+                ? pkg.metadata().get("datasourcePermissions") : null;
+        if (!(permsObj instanceof List<?> perms)) {
+            log.warn("package_missing_datasource_permissions version={} legacy_mode=allow",
+                    pkg.manifest().packageVersion());
+            return null;
+        }
+
+        List<String> allowed = List.of();
+        for (Object item : perms) {
+            if (item instanceof Map<?, ?> perm
+                    && DEFAULT_DATASOURCE.equals(String.valueOf(perm.get("datasource")))
+                    && perm.get("tables") instanceof List<?> tableList) {
+                allowed = tableList.stream().map(String::valueOf).toList();
+                break;
+            }
+        }
+
+        for (String table : sqlGuardService.tablesIn(sql)) {
+            boolean matched = false;
+            for (String a : allowed) {
+                if (a.equalsIgnoreCase(table)) {
+                    matched = true;
+                    break;
+                }
+            }
+            if (!matched) {
+                return "表 " + table + " 不在发布包授权范围内（授权表: " + allowed + "）";
+            }
+        }
+        return null;
     }
 
     private void writeExecutionAudit(PublishPackage pkg, QueryExecutionResult result) {
