@@ -8,6 +8,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
+import top.cywu.magicops.console.service.ApprovalSeparationException;
 import top.cywu.magicops.governance.lifecycle.IllegalStateTransitionException;
 
 import java.time.Instant;
@@ -34,6 +35,23 @@ public class GlobalExceptionHandler {
                 .body(Map.of("error", "Conflict", "message", ex.getMessage(),
                         "from", ex.getFrom().name(), "to", ex.getTo().name(),
                         "timestamp", Instant.now().toString()));
+    }
+
+    @ExceptionHandler(ApprovalSeparationException.class)
+    public ResponseEntity<Map<String, Object>> handleApprovalSeparation(ApprovalSeparationException ex) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(Map.of("error", "Forbidden", "message", ex.getMessage(),
+                        "timestamp", Instant.now().toString()));
+    }
+
+    /**
+     * 安全异常必须交还 Spring Security 过滤链处理（403/401），
+     * 不能被通用处理器吞掉变成 500。
+     */
+    @ExceptionHandler({org.springframework.security.access.AccessDeniedException.class,
+            org.springframework.security.core.AuthenticationException.class})
+    public void handleSecurityException(RuntimeException ex) throws RuntimeException {
+        throw ex;
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

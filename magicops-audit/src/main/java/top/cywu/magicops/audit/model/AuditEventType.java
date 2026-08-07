@@ -31,6 +31,12 @@ public enum AuditEventType {
     /** 脚本执行。 */
     SCRIPT_EXECUTED,
 
+    /** 角色分配（切片 31）。 */
+    ROLE_ASSIGNED,
+
+    /** 角色回收（切片 31）。 */
+    ROLE_REVOKED,
+
     /** 审计写入失败。 */
     AUDIT_WRITE_FAILED
 }

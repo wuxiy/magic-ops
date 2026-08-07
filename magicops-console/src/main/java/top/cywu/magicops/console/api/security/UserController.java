@@ -10,6 +10,7 @@ import top.cywu.magicops.console.dto.security.CreateUserRequest;
 import top.cywu.magicops.console.dto.security.UserResponse;
 import top.cywu.magicops.console.entity.security.RoleEntity;
 import top.cywu.magicops.console.entity.security.UserEntity;
+import top.cywu.magicops.console.security.CurrentActor;
 import top.cywu.magicops.console.service.security.UserService;
 import top.cywu.magicops.core.model.Permissions;
 
@@ -59,8 +60,19 @@ public class UserController {
     @PostMapping("/{id}/roles")
     public ResponseEntity<Map<String, Object>> assignRole(@PathVariable Long id,
                                                           @Valid @RequestBody AssignRoleRequest request) {
-        userService.assignRole(id, request.roleName(),
-                request.grantedBy() != null ? request.grantedBy() : "system");
+        // 切片 31：授予人强制取登录身份，忽略客户端传值
+        userService.assignRole(id, request.roleName(), CurrentActor.username());
+        List<String> roles = userService.getUserRoleNames(id);
+        return ResponseEntity.ok(Map.of("userId", id, "roles", roles));
+    }
+
+    /**
+     * 回收用户角色（切片 31）。需要 user:manage 权限，关键审计。
+     */
+    @DeleteMapping("/{id}/roles/{roleId}")
+    public ResponseEntity<Map<String, Object>> revokeRole(@PathVariable Long id,
+                                                          @PathVariable Long roleId) {
+        userService.revokeRole(id, roleId, CurrentActor.username());
         List<String> roles = userService.getUserRoleNames(id);
         return ResponseEntity.ok(Map.of("userId", id, "roles", roles));
     }

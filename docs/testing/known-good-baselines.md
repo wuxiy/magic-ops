@@ -16,6 +16,24 @@
 
 ## 最近完整验证
 
+2026-08-08：第五阶段切片 31（身份与追责）
+
+- `mvn test`：通过（253 个测试，0 失败，较切片 30 新增 10 例）
+  - GovernanceActorTest 6 例（审计 actor 为登录用户、自审自批 403、越权 403、角色分配/回收关键审计与 RBAC 负例）
+  - DataInitializerTest 4 例（prod 不产生测试账号、缺密码不初始化）
+- E2E 闭环测试 11 步全部通过（新增自审自批拒绝负例；提交/审批改为双账号流程）。
+- 附带修复既有缺陷：RBAC 越权原返回 500（AccessDeniedException 被通用异常处理器吞掉），现正确返回 403。
+
+2026-08-07：第五阶段切片 30（SQL Guard 与数据修复强制化）
+
+- `mvn test`：通过（243 个测试，0 失败，较前次基线新增 34 例）
+  - SqlGuardServiceTest 46 例（JSQLParser 解析树方案，含注释混淆、多语句、内联注释写操作等绕过负例）
+  - RepairExecutionServiceTest 16 例（审批凭据校验、内容 hash 绑定、表级白名单、超行数上限事务回滚）
+  - QueryExecutionServiceTest 10 例（表级白名单，含子查询越权拒绝）
+  - PackageBuildServiceTest 8 例（治理凭据嵌入与签名保护，fail-closed 负例）
+- E2E 闭环测试 10 步全部通过（修复 Runtime 启动回归后，含治理凭据的新发布链路验签加载与执行正常）。
+- 当前基线整体升级待第五阶段全部切片关闭后执行（见 `docs/plans/2026-08-07-0000-fifth-stage-production-gate.md`）。
+
 2026-07-11：切片 12-15 功能完善
 
 - `mvn test`：通过（148 个测试，0 失败）

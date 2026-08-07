@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # MagicOps E2E 闭环测试脚本
-# 验证：创建脚本 → 调试 → 提交 → 审批 → 签名 → 推送 → Runtime 验签加载 → 执行 → 审计
+# 验证：创建脚本 → 调试 → 提交 → 自审自批拒绝（切片 31）→ 审批 → 签名 → 推送 → Runtime 验签加载 → 执行 → 审计
 #
 # 前置条件：
 #   1. mvn install -DskipTests 已完成
@@ -16,6 +16,7 @@ RUNTIME_PORT=8081
 CONSOLE_URL="http://localhost:$CONSOLE_PORT"
 RUNTIME_URL="http://localhost:$RUNTIME_PORT"
 AUTH="admin:magicops-admin"
+APPR_AUTH="approver:appr123"
 PASS_COUNT=0
 FAIL_COUNT=0
 
@@ -89,16 +90,22 @@ HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -u $AUTH -X POST "$CONSOLE_UR
   -d '{"version":"1.0.0","riskLevel":"LOW"}')
 if [ "$HTTP_CODE" = "201" ]; then pass "Version created: v1.0.0"; else fail "Version creation failed: HTTP $HTTP_CODE"; fi
 
-step "Step 4: 提交审批"
+step "Step 4: 提交审批 (admin)"
 HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -u $AUTH -X POST "$CONSOLE_URL/api/scripts/$SCRIPT_ID/submit")
-if [ "$HTTP_CODE" = "200" ]; then pass "Submitted for approval"; else fail "Submit failed: HTTP $HTTP_CODE"; fi
+if [ "$HTTP_CODE" = "200" ]; then pass "Submitted for approval by admin"; else fail "Submit failed: HTTP $HTTP_CODE"; fi
 
-step "Step 5: 审批通过 (APPROVED)"
-APPROVE_RESP=$(curl -s -u $AUTH -X POST "$CONSOLE_URL/api/scripts/$SCRIPT_ID/approve" \
+step "Step 5a: 自审自批被拒绝 (切片 31 分离规则)"
+HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -u $AUTH -X POST "$CONSOLE_URL/api/scripts/$SCRIPT_ID/approve" \
+  -H "Content-Type: application/json" \
+  -d '{"decision":"APPROVED","comment":"self approve attempt"}')
+if [ "$HTTP_CODE" = "403" ]; then pass "Self-approval rejected: HTTP 403"; else fail "Self-approval should be rejected, got HTTP $HTTP_CODE"; fi
+
+step "Step 5b: 审批通过 (approver, APPROVED)"
+APPROVE_RESP=$(curl -s -u $APPR_AUTH -X POST "$CONSOLE_URL/api/scripts/$SCRIPT_ID/approve" \
   -H "Content-Type: application/json" \
   -d '{"decision":"APPROVED","comment":"E2E test approved"}')
 DECISION=$(echo "$APPROVE_RESP" | python3 -c "import sys,json; print(json.load(sys.stdin)['decision'])")
-if [ "$DECISION" = "APPROVED" ]; then pass "Approved by reviewer"; else fail "Approval failed: $DECISION"; fi
+if [ "$DECISION" = "APPROVED" ]; then pass "Approved by approver"; else fail "Approval failed: $DECISION"; fi
 
 # 验证脚本状态
 STATUS=$(curl -s -u $AUTH "$CONSOLE_URL/api/scripts/$SCRIPT_ID" | python3 -c "import sys,json; print(json.load(sys.stdin)['status'])")

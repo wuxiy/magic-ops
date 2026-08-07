@@ -16,6 +16,7 @@ import top.cywu.magicops.console.entity.ScriptEntity;
 import top.cywu.magicops.console.publish.PackageBuildService;
 import top.cywu.magicops.console.publish.PushService;
 import top.cywu.magicops.console.repository.ScriptRepository;
+import top.cywu.magicops.console.security.CurrentActor;
 import top.cywu.magicops.console.service.ScriptLifecycleService;
 import top.cywu.magicops.sign.model.PublishPackage;
 
@@ -55,7 +56,7 @@ public class ScriptController {
     @PreAuthorize("hasAuthority('" + Permissions.SCRIPT_CREATE + "')")
     public ResponseEntity<ScriptResponse> create(@Valid @RequestBody CreateScriptRequest request) {
         ScriptEntity script = lifecycleService.createScript(
-                request.name(), request.projectCode(), request.scriptType(), "system");
+                request.name(), request.projectCode(), request.scriptType(), CurrentActor.username());
         return ResponseEntity.status(HttpStatus.CREATED).body(ScriptResponse.from(script));
     }
 
@@ -86,14 +87,14 @@ public class ScriptController {
     @PreAuthorize("hasAuthority('" + Permissions.SCRIPT_SUBMIT + "')")
     public ResponseEntity<Void> createVersion(@PathVariable Long id,
                                               @Valid @RequestBody CreateVersionRequest request) {
-        lifecycleService.createVersion(id, request.version(), request.riskLevel(), "system");
+        lifecycleService.createVersion(id, request.version(), request.riskLevel(), CurrentActor.username());
         return ResponseEntity.status(HttpStatus.CREATED).build();
     }
 
     @PostMapping("/{id}/submit")
     @PreAuthorize("hasAuthority('" + Permissions.SCRIPT_SUBMIT + "')")
     public ResponseEntity<Void> submit(@PathVariable Long id) {
-        lifecycleService.submitForApproval(id, "system");
+        lifecycleService.submitForApproval(id, CurrentActor.username());
         return ResponseEntity.ok().build();
     }
 
@@ -102,7 +103,7 @@ public class ScriptController {
     public ResponseEntity<ApprovalEntity> approve(@PathVariable Long id,
                                                   @Valid @RequestBody ApprovalRequest request) {
         ApprovalEntity approval = lifecycleService.decide(
-                id, request.decision(), "reviewer", request.comment());
+                id, request.decision(), CurrentActor.username(), request.comment());
         return ResponseEntity.ok(approval);
     }
 
@@ -118,7 +119,7 @@ public class ScriptController {
             List<Long> scriptIds = scriptIdNumbers.stream().map(Number::longValue).toList();
             String environment = (String) request.getOrDefault("environment", "development");
 
-            PublishPackage pkg = packageBuildService.buildAndSign(scriptIds, environment, "publisher");
+            PublishPackage pkg = packageBuildService.buildAndSign(scriptIds, environment, CurrentActor.username());
             String packageJson = objectMapper.writeValueAsString(pkg.toMap());
             boolean pushed = pushService.push(runtimeUrl, packageJson);
 

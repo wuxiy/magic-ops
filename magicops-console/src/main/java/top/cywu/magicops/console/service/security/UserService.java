@@ -5,6 +5,9 @@ import org.slf4j.LoggerFactory;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import top.cywu.magicops.audit.model.AuditEventType;
+import top.cywu.magicops.audit.model.AuditRecord;
+import top.cywu.magicops.audit.service.AuditService;
 import top.cywu.magicops.console.entity.security.RoleEntity;
 import top.cywu.magicops.console.entity.security.UserEntity;
 import top.cywu.magicops.console.entity.security.UserRoleEntity;
@@ -14,6 +17,7 @@ import top.cywu.magicops.console.repository.security.UserRoleRepository;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
@@ -29,15 +33,18 @@ public class UserService {
     private final RoleRepository roleRepository;
     private final UserRoleRepository userRoleRepository;
     private final PasswordEncoder passwordEncoder;
+    private final AuditService auditService;
 
     public UserService(UserRepository userRepository,
                        RoleRepository roleRepository,
                        UserRoleRepository userRoleRepository,
-                       PasswordEncoder passwordEncoder) {
+                       PasswordEncoder passwordEncoder,
+                       AuditService auditService) {
         this.userRepository = userRepository;
         this.roleRepository = roleRepository;
         this.userRoleRepository = userRoleRepository;
         this.passwordEncoder = passwordEncoder;
+        this.auditService = auditService;
     }
 
     /**
@@ -77,8 +84,36 @@ public class UserService {
         userRole.setGrantedBy(grantedBy);
         userRole = userRoleRepository.save(userRole);
 
+        auditService.write(AuditRecord.critical(
+                AuditEventType.ROLE_ASSIGNED, "User", String.valueOf(userId),
+                grantedBy, Map.of("role", roleName)));
+
         log.info("role_assigned userId={} role={} by={}", userId, roleName, grantedBy);
         return userRole;
+    }
+
+    /**
+     * 回收用户角色（切片 31）。关键审计记录操作人。
+     *
+     * @throws IllegalArgumentException 用户或角色绑定不存在
+     */
+    public void revokeRole(Long userId, Long roleId, String revokedBy) {
+        UserEntity user = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("用户不存在: " + userId));
+        RoleEntity role = roleRepository.findById(roleId)
+                .orElseThrow(() -> new IllegalArgumentException("角色不存在: " + roleId));
+        UserRoleEntity userRole = userRoleRepository.findByUserIdAndRoleId(userId, roleId)
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "用户 " + user.getUsername() + " 未拥有角色 " + role.getName()));
+
+        userRoleRepository.delete(userRole);
+
+        auditService.write(AuditRecord.critical(
+                AuditEventType.ROLE_REVOKED, "User", String.valueOf(userId),
+                revokedBy, Map.of("role", role.getName(),
+                        "grantedBy", userRole.getGrantedBy() != null ? userRole.getGrantedBy() : "")));
+
+        log.info("role_revoked userId={} role={} by={}", userId, role.getName(), revokedBy);
     }
 
     /**
