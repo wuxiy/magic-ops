@@ -56,6 +56,10 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      # 切片 33：Runtime 以 ddl-auto=validate 校验 Console 经 Flyway 建好的 schema，
+      # 必须等 Console 健康上线（Flyway 迁移完成）后再启动，否则 validate 会因表不存在失败。
+      console:
+        condition: service_healthy
     environment:
       SPRING_PROFILES_ACTIVE: prod
       DB_HOST: postgres

@@ -50,7 +50,7 @@
   - `KeyProvider` prod fail-fast（禁临时密钥）；`PushSecretAuthenticationFilter` 收包端点 401。
 - 硬阻断确认（切片 33/34 未实现）：激活包仅内存（`PackageVerificationService:44` AtomicReference，重启即丢）、Runtime 执行审计落内存 fallback、`HttpTargetRegistry` 生产不注册、无回滚/下线端点；query/adapter 仍执行请求体内容而非签名包脚本。
 - 修正：前端构建产物现已正确 gitignore（`static/console/` 跟踪数为 0），原"产物直接提交 git"不再成立；但前端仍未纳入 Maven 构建。
-- 仍不完整/未验证：Docker Compose 从未真实 `docker-compose up` + PostgreSQL E2E；达梦方言未抽样验证；无 CI；集成测试全 H2。
+- Docker Compose E2E on PostgreSQL 已通过（2026-08-09，15 步）；仍不完整/未验证：达梦方言未抽样验证；无 CI；集成测试全 H2。
 
 2026-08-08：第五阶段切片 32（密钥与凭据固化）
 
@@ -102,5 +102,5 @@
 ## 待验证
 
 - magic-api fork 代码整合（javax → jakarta 迁移，切片 16）；
-- Docker Compose 端到端验证（`docker-compose up` + E2E 在 PostgreSQL 上执行）；
+- Docker Compose E2E on PostgreSQL 已通过（2026-08-09，15 步：含激活包重启重载、审计持久化、脚本引用执行、裸 SQL 拒绝）；
 - 达梦数据库真实环境验证。

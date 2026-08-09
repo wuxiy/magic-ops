@@ -10,4 +10,9 @@ ENV SPRING_PROFILES_ACTIVE=prod
 
 EXPOSE 8080
 
+# 健康检查：Web 端口可响应即说明 Spring 上下文刷新完成（含 Flyway 迁移）。
+# Runtime 以 service_healthy 依赖本服务，确保建表完成后再 validate。
+HEALTHCHECK --interval=5s --timeout=5s --start-period=40s --retries=12 \
+  CMD wget -q --spider http://127.0.0.1:8080/ || exit 1
+
 ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar app.jar"]

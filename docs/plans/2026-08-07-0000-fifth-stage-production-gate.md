@@ -196,6 +196,7 @@
 - 切片 30-31 完成后执行一次全量 `mvn test` 回归。
 - 切片 33 完成后执行 Docker Compose E2E 回归（含重启与审计持久化验证）。
 - 切片 34 完成后重跑 E2E 并更新 `docs/testing/known-good-baselines.md`。
+- **Docker Compose E2E on PostgreSQL 已完成（2026-08-09）**：`docs/testing/e2e/e2e-docker-postgres.sh` 15 步全部通过，验证切片 33/34 在真实 PostgreSQL 下行为（激活包重启重载、审计持久化、脚本引用执行、裸 SQL 拒绝）。修复 compose ordering：Runtime `depends_on` Console 健康上线后再启动（确保 Flyway 建表完成后再 `validate`），Dockerfile 增 healthcheck。
 
 ## 风险和约束
 

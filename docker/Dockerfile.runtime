@@ -10,4 +10,8 @@ ENV SPRING_PROFILES_ACTIVE=prod
 
 EXPOSE 8081
 
+# 健康检查：收包状态查询端点（permitAll GET）。
+HEALTHCHECK --interval=5s --timeout=5s --start-period=30s --retries=12 \
+  CMD wget -q --spider http://127.0.0.1:8081/api/packages/active || exit 1
+
 ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar app.jar"]
