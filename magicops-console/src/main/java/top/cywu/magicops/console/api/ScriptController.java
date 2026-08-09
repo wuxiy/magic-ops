@@ -139,4 +139,34 @@ public class ScriptController {
                     "status", "error", "message", e.getMessage()));
         }
     }
+
+    /**
+     * 下线当前激活的发布包（切片 38）。向 Runtime 推送下线指令，
+     * Runtime 清空激活包并拒绝脚本执行。回滚不走此端点--回滚是重新发布上一个已签名包。
+     */
+    @PostMapping("/deactivate")
+    @PreAuthorize("hasAuthority('" + Permissions.SCRIPT_PUBLISH + "')")
+    public ResponseEntity<Map<String, Object>> deactivate(@RequestBody Map<String, Object> request) {
+        try {
+            String operator = CurrentActor.username();
+            String reason = (String) request.getOrDefault("reason", "未提供");
+
+            boolean deactivated = pushService.deactivate(runtimeUrl, operator, reason);
+
+            if (deactivated) {
+                return ResponseEntity.ok(Map.of(
+                        "status", "deactivated",
+                        "operator", operator,
+                        "reason", reason,
+                        "runtimeUrl", runtimeUrl));
+            } else {
+                return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body(Map.of(
+                        "status", "deactivate_failed",
+                        "runtimeUrl", runtimeUrl));
+            }
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
+                    "status", "error", "message", e.getMessage()));
+        }
+    }
 }

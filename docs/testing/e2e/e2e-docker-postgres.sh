@@ -158,17 +158,32 @@ QR2=$(curl -s -u runtime:docker-runtime-pw -X POST "$RUNTIME_URL/api/query" \
 QS2=$(echo "$QR2" | python3 -c "import sys,json; print(json.load(sys.stdin).get('success'))" 2>/dev/null || echo "False")
 if [ "$QS2" = "True" ]; then pass "Query via script reference after restart"; else fail "Query after restart failed: $QR2"; fi
 
-step "Step 14: 执行审计落 PostgreSQL audit_records (切片 33-a)"
+step "Step 14: Console 推送下线指令，Runtime 停用激活包 (切片 38)"
+DEACT=$(curl -s -u $AUTH -X POST "$CONSOLE_URL/api/scripts/deactivate" \
+  -H "Content-Type: application/json" -d '{"reason":"E2E 下线验证"}')
+DEACT_ST=$(echo "$DEACT" | python3 -c "import sys,json; print(json.load(sys.stdin).get('status',''))" 2>/dev/null || echo "")
+if [ "$DEACT_ST" = "deactivated" ]; then pass "Console deactivate pushed, Runtime accepted"; else fail "Deactivate failed: $DEACT"; fi
+
+step "Step 15: 下线后脚本引用执行被拒绝 (切片 38)"
+QR3=$(curl -s -u runtime:docker-runtime-pw -X POST "$RUNTIME_URL/api/query" \
+  -H "Content-Type: application/json" -d "{\"scriptId\":\"$SCRIPT_ID\",\"traceId\":\"docker-003\"}")
+QR3_ERR=$(echo "$QR3" | python3 -c "import sys,json; print(json.load(sys.stdin).get('error',''))" 2>/dev/null || echo "")
+if echo "$QR3_ERR" | grep -q "没有已激活"; then pass "Query rejected after deactivate"; else fail "Query should be rejected after deactivate: $QR3"; fi
+
+
+step "Step 16: 执行审计落 PostgreSQL audit_records (切片 33-a)"
 AUDIT_CNT=$(docker compose exec -T postgres psql -U magicops -d magicops -t \
   -c "SELECT count(*) FROM audit_records WHERE event_type IN ('PACKAGE_LOADED','SCRIPT_EXECUTED')" 2>/dev/null | tr -d '[:space:]' || echo "0")
 if [ "$AUDIT_CNT" -ge 2 ] 2>/dev/null; then pass "Audit records persisted to PostgreSQL: $AUDIT_CNT"; else fail "Expected >=2 audit records, got: $AUDIT_CNT"; fi
 
-step "Step 15: 激活包落 PostgreSQL active_packages (切片 33-b)"
-PKG_CNT=$(docker compose exec -T postgres psql -U magicops -d magicops -t \
+step "Step 17: 激活包落 PostgreSQL active_packages（下线后应为 INACTIVE，切片 33-b + 38）"
+PKG_INACTIVE=$(docker compose exec -T postgres psql -U magicops -d magicops -t \
+  -c "SELECT count(*) FROM active_packages WHERE status='INACTIVE'" 2>/dev/null | tr -d '[:space:]' || echo "0")
+PKG_ACTIVE=$(docker compose exec -T postgres psql -U magicops -d magicops -t \
   -c "SELECT count(*) FROM active_packages WHERE status='ACTIVE'" 2>/dev/null | tr -d '[:space:]' || echo "0")
-if [ "$PKG_CNT" -ge 1 ] 2>/dev/null; then pass "Active package persisted to PostgreSQL: $PKG_CNT row(s)"; else fail "Expected active package row, got: $PKG_CNT"; fi
+if [ "$PKG_INACTIVE" -ge 1 ] && [ "$PKG_ACTIVE" = "0" ] 2>/dev/null; then pass "Package persisted (INACTIVE=$PKG_INACTIVE, ACTIVE=$PKG_ACTIVE after deactivate)"; else fail "Expected INACTIVE>=1 & ACTIVE=0, got INACTIVE=$PKG_INACTIVE ACTIVE=$PKG_ACTIVE"; fi
 
-step "Step 16: actuator/health 真实端点可匿名访问 (切片 35)"
+step "Step 18: actuator/health 真实端点可匿名访问 (切片 35)"
 CONSOLE_H=$(curl -s -o /dev/null -w "%{http_code}" "$CONSOLE_URL/actuator/health")
 RUNTIME_H=$(curl -s -o /dev/null -w "%{http_code}" "$RUNTIME_URL/actuator/health")
 if [ "$CONSOLE_H" = "200" ] && [ "$RUNTIME_H" = "200" ]; then pass "actuator/health up on Console($CONSOLE_H) and Runtime($RUNTIME_H)"; else fail "actuator/health: console=$CONSOLE_H runtime=$RUNTIME_H"; fi

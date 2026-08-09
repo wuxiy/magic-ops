@@ -50,7 +50,7 @@
 ### 上线前必须解决（硬阻断）
 
 1. **达梦方言抽样验证**（接入目标业务库前置）：JSQLParser、`active_packages` TEXT、`data_sources` 同步、`script_versions.datasource` 在达梦下未验证。当前全部基于 H2/PostgreSQL。
-2. **Console 缺下线发送端**：`PushService` 只有 `push()`，无 `deactivate` 调用方（`PACKAGE_DEACTIVATE_PATH` 在 console 模块无引用）。Runtime 下线端点已就位且 fail-closed，但无自动化 Console 客户端触发下线。
+2. ✅(切片38已修复) Console 缺下线发送端：PushService.deactivate() 已建（携带共享密钥推送到 /api/packages/deactivate），ScriptController 新增 POST /api/scripts/deactivate 端点（script:publish 权限）。Docker E2E 18 步验证下线闭环。
 
 ### 应收紧的治理弱点（切片 38 已全部修复，2026-08-09）
 

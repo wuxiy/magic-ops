@@ -14,9 +14,16 @@
 
 **第五阶段（切片 30-35）**：SQL Guard 解析器化与数据修复事务化强制、身份与追责、密钥与凭据固化、Runtime 闭环（激活包持久化与启动重载、Runtime 审计持久化、HttpTarget 从 DB 同步、发布下线端点）、执行语义对齐（脚本引用模式，拒绝裸 SQL/裸目标调用）、可观测（actuator+Prometheus+结构化日志+Console 限流/traceId）+ CI；业务数据源管理 API + Runtime 数据源同步（只读灰度前置）；只读灰度本体（发布包声明目标数据源 + Query/Repair 按声明路由）。
 
-**测试**：304 个单元测试全部通过（2026-08-09 切片 37 关闭复核）。
+**测试**：306 个单元测试全部通过（2026-08-09 切片 38 关闭复核）。
 
 ## 最近完整验证
+
+2026-08-09：切片 38 Console 下线发送端
+
+- mvn test：306 例通过（0 失败，12 模块全绿），较前 304 新增 2 例（PushService deactivate 测试）。
+- Console 下线发送端：PushService.deactivate()（携带共享密钥推送到 /api/packages/deactivate）+ ScriptController POST /api/scripts/deactivate（script:publish 权限，CurrentActor 操作人）。
+- Docker E2E on PostgreSQL 18/18 通过（新增 Step 14/15 下线闭环：Console 推下线 -> Runtime 停用 -> 执行被拒 -> active_packages 置 INACTIVE）。
+- 硬阻断清零：Console 下线发送端已补齐；剩余仅达梦方言抽样验证。
 
 2026-08-09：切片 38 治理弱点收紧（fail-closed 加固）
 
