@@ -29,6 +29,55 @@
 
 修正（A6）：前端构建产物现已正确 gitignore（`.gitignore` 覆盖 `magicops-console/src/main/resources/static/console/`，git 跟踪数为 0），原"前端构建产物直接提交 git"不再成立；但"前端未纳入 Maven 构建（无 frontend-maven-plugin）"仍成立。其余 A5（可观测）、A6（无 CI、集成测试全 H2、无达梦验证、Docker Compose 未真实跑）仍开放。
 
+## 2026-08-09 第二次复核（切片 30-37 关闭后，整体生产准入复核）
+
+本节为切片 30-37 全部关闭后的**整体生产准入复核**。基线：`mvn test` 304 例通过、Docker Compose E2E on PostgreSQL 16/16 通过、12 模块全绿。复核方式：并行两个代码级验证子代理 + 独立 grep/Read 交叉确认 + 真实构建与 Docker E2E。
+
+### 结论：只读动态查询具备灰度试运行条件；整体接入生产做日常运维仍不建议
+
+代码级治理强制闭环已完成（切片 30-37），运营支撑能力（可观测/CI/数据源管理/灰度本体）已补齐。**建议按灰度顺序先开放只读动态查询（风险最低），数据修复与 Arthas 诊断在补齐下方"上线前必须解决"项后再开放。**
+
+### 已关闭并代码验证（P0 全部 + P1 运营支撑）
+
+- P0-1 治理强制化（切片 30）：JSQLParser AST + 审批凭据 + contentHash + 表白名单 + 事务化回滚。✅
+- P0-2 身份与追责（切片 31）：actor 绑定登录用户、提交人≠审批人、prod 禁测试账号。✅
+- P0-3 密钥与凭据固化（切片 32）：prod fail-fast、KeyStore 装配、收包共享密钥。✅
+- P0-4 Runtime 闭环（切片 33）：激活包持久化+启动重载、Runtime 审计持久化、HttpTarget 同步、下线端点。✅
+- P0-5 执行语义对齐（切片 34）：脚本引用模式，拒绝裸 SQL/裸目标。✅
+- 可观测+CI（切片 35）：actuator+Prometheus、结构化日志、Console 限流/traceId、GitHub Actions。✅
+- 业务数据源管理（切片 36）+ 只读灰度本体（切片 37）：数据源 CRUD + 发布包声明数据源 + Query/Repair 按声明路由。✅
+
+### 上线前必须解决（硬阻断）
+
+1. **达梦方言抽样验证**（接入目标业务库前置）：JSQLParser、`active_packages` TEXT、`data_sources` 同步、`script_versions.datasource` 在达梦下未验证。当前全部基于 H2/PostgreSQL。
+2. **Console 缺下线发送端**：`PushService` 只有 `push()`，无 `deactivate` 调用方（`PACKAGE_DEACTIVATE_PATH` 在 console 模块无引用）。Runtime 下线端点已就位且 fail-closed，但无自动化 Console 客户端触发下线。
+
+### 应收紧的治理弱点（建议上线前修复，非硬阻断但削弱纵深）
+
+> 复核发现以下 fail-OPEN 遗留兼容路径，与 Javadoc "fail-closed" 声明不一致：
+
+- **`datasourcePermissions` 元数据缺失时 fail-OPEN**：`QueryExecutionService:198-200`/`:224-228`、`RepairExecutionService:240-244` 在包无 `datasourcePermissions` 时仅 `log.warn` 放行（非 fail-closed）。当前 `PackageBuildService` 总会写入该字段（含 `default` 兜底），故正常签名包不可达；但伪造/遗留包可绕过表白名单层（仍受审批凭据层保护）。建议收紧为 fail-closed 或明确仅 dev 兼容。
+- **未声明数据源回退 `default` 而非拒绝**：`resolveScriptDatasource`（Query:186/Repair:226）在无 `scriptDatasource` 元数据时回退 default，与"未声明即拒绝"的严格语义有差距。属遗留兼容，正常包总有声明。
+- **提交人/审批人分离的 null 守卫 fail-OPEN**：`ScriptLifecycleService:167` 当 `submittedBy` 为 null 时跳过校验（正常流程总会设值）。建议改 null-safe fail-closed。
+- **公共 `executeQuery` 3/4 参重载绕过切片 37 路由**：`QueryExecutionService:57,70` 跳过脚本数据源路由与权限校验（当前生产仅 Controller 用 5 参重载，未调用，属潜在风险 API）。
+- **共享密钥明文比较 + 精确 URI 匹配**：`PushSecretAuthenticationFilter:49` 用 `String.equals`（时序攻击面），`:74-75` 精确 URI 匹配（未来 `/api/packages/**` 新 POST 端点需手动加入白名单）。
+
+### 运营支撑仍开放（非阻断，按灰度阶段补齐）
+
+- Arthas 诊断仍模拟态：`simulateFallback=true` 默认、`ArthasTunnelClient` 未配置即模拟、诊断三表无运行时写入、未接 AuditService、`cleanupExpiredSessions` 无 `@Scheduled` 调用。属第二阶段，真实 Tunnel 联调后再上线。
+- 限流单实例内存态：`RateLimitFilter`（Console+Runtime）用 `ConcurrentHashMap`，多实例需 Redis。
+- 前端未纳入 Maven：无 `frontend-maven-plugin`，CI 不含前端构建。
+- 集成测试全 H2：无 Testcontainers/真实 PostgreSQL 单元测试（Docker E2E 已覆盖真实 PG，但非自动化测试）。
+
+### 灰度试运行建议顺序
+
+1. 只读动态查询（SQL Guard 仅 SELECT + 1000 行上限 + 脚本引用执行 + 数据源声明路由 + 审计全部就位）-- **现已具备条件**，建议先接 1-2 个低风险业务只读查询，达梦方言抽样验证后。
+2. HTTP 接口适配（HttpTarget 同步已就位）-- 对已有内部系统做只读拉取。
+3. 数据修复（需先收紧上述 fail-OPEN 弱点 + 完成达梦验证）。
+4. Arthas 诊断（真实 Tunnel 联调之后）。
+
+
+
 ## A. 阻断性缺口（上线前必须解决）
 
 ### A1 治理强制断点（保护区）
