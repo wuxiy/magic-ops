@@ -39,6 +39,9 @@ magic-api:
 # Arthas 诊断中心 Tunnel 配置
 # enabled=false 时诊断命令走模拟降级；接入真实 Arthas Tunnel Server 时启用并配置 server-url
 magicops:
+  # 切片 32：推送发布包到 Runtime 的共享密钥（为空时不携带认证头，仅限非生产）
+  runtime:
+    push-secret: ${MAGICOPS_RUNTIME_SHARED_SECRET:}
   diagnosis:
     tunnel:
       enabled: false

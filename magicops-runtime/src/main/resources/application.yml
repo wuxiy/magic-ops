@@ -14,6 +14,11 @@ spring:
       name: runtime
       password: runtime
 
+# 发布包推送共享密钥（切片 32）。为空且非 prod 时收包端点放行并告警；prod 下 fail-closed。
+magicops:
+  runtime:
+    push-secret: ${MAGICOPS_RUNTIME_SHARED_SECRET:}
+
 logging:
   level:
     top.cywu.magicops: DEBUG

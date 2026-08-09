@@ -29,6 +29,16 @@ spring:
 magicops:
   runtime:
     url: ${RUNTIME_URL:http://localhost:8081}
+    # 推送共享密钥：prod 必须与 Runtime 的 MAGICOPS_RUNTIME_SHARED_SECRET 一致
+    push-secret: ${MAGICOPS_RUNTIME_SHARED_SECRET:}
+  sign:
+    # 生产环境禁止临时签名密钥：缺失密钥时启动 fail-fast
+    allow-ephemeral-keys: false
+    keystore:
+      # KeyStore 持久化密钥（JKS/PKCS12，JDK 标准）。也可改用 MAGICOPS_PRIVATE_KEY/PUBLIC_KEY 环境变量
+      path: ${MAGICOPS_KEYSTORE_PATH:}
+      password: ${MAGICOPS_KEYSTORE_PASSWORD:}
+      type: ${MAGICOPS_KEYSTORE_TYPE:JKS}
 
 logging:
   level:

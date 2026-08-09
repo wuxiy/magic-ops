@@ -2,7 +2,7 @@
 
 ## 状态
 
-进行中。切片 30（2026-08-07）、切片 31（2026-08-08）已获人工确认并实现，见各切片关闭记录。依据 `docs/analysis/2026-08-07-production-readiness-gap-analysis.md` 的 P0 清单整理。
+进行中。切片 30（2026-08-07）、切片 31（2026-08-08）、切片 32（2026-08-08）已获人工确认并实现，见各切片关闭记录。依据 `docs/analysis/2026-08-07-production-readiness-gap-analysis.md` 的 P0 清单整理。
 
 ## 目标
 
@@ -91,7 +91,7 @@
 - 验证：全量 `mvn test` 253 例通过（0 失败），新增 `GovernanceActorTest` 6 例（审计 actor、自审自批 403、越权 403、角色回收闭环与负例）与 `DataInitializerTest` 4 例；E2E 更新为 admin/approver 双账号流程并新增自审自批负例，11 步全部通过。
 - 遗留事项：HttpTarget 等资源 CRUD 创建人字段绑定登录身份不在本切片范围，随后续治理切片处理。
 
-### 切片 32：密钥与凭据固化
+### 切片 32：密钥与凭据固化（已关闭，2026-08-08）
 
 目标：
 
@@ -113,6 +113,18 @@
 - 未携带或不匹配共享密钥的包推送被 401 拒绝（测试覆盖）；
 - 仓库内不再存在真实密码（`deploy/.env` 与 compose 检查通过）；
 - 密钥轮换测试在持久化 Provider 下仍通过。
+
+关闭记录：
+
+- 实现原则：优先复用开源/标准组件，不自研。密钥持久化用 JDK 标准 `java.security.KeyStore`（JKS/PKCS12），推送认证用 Spring Security 过滤器链标准扩展点（`OncePerRequestFilter`），fail-fast 用 Spring Boot 配置占位符（`${VAR:?}`）与 Bean 初始化异常，未新增任何第三方依赖。
+- `KeyProvider` 重构为配置驱动（`@Autowired` 构造器注入）：按 KeyStore（`magicops.sign.keystore.path/password/type`）→ 环境变量（`MAGICOPS_PRIVATE_KEY/PUBLIC_KEY`）→ 临时密钥（仅 `magicops.sign.allow-ephemeral-keys=true`）顺序装配；两应用 prod 配置均置 `allow-ephemeral-keys: false`，缺密钥时抛 `IllegalStateException` 启动终止并给出两种修复路径。KeyStore 模式下全部别名进入信任集（`isTrustedKeyId`），支持轮换过渡期。
+- `KeyStoreKeyProvider` 增加类型参数（JKS/PKCS12，默认 JKS），作为 `KeyProvider` 的持久化装配实现。
+- 新增 `PushSecretAuthenticationFilter`（Runtime SecurityFilterChain，置于 `UsernamePasswordAuthenticationFilter` 之前），仅拦截 `POST /api/packages`：配置了共享密钥则强制 `X-MagicOps-Push-Secret` 头匹配，缺失/不匹配返回 401；未配置密钥且 prod profile 时 fail-closed 返回 401；非 prod 放行并告警。请求头与路径常量收敛到 core 模块 `PushProtocol`，Console/Runtime 共享，无跨应用模块依赖。
+- `PushService` 注入 `magicops.runtime.push-secret`（环境变量 `MAGICOPS_RUNTIME_SHARED_SECRET`），非空时推送携带共享密钥头。
+- Runtime prod 凭据外置：`spring.security.user.password` 改为 `${RUNTIME_PASSWORD:?...}` fail-fast 占位符。
+- 凭据出库：根 `docker-compose.yml` 全部硬编码密码改为 `${VAR:?}` 必填引用（DB、管理员、Runtime、签名密钥、推送密钥），清理无人消费的 `CONSOLE_ADMIN_PASSWORD`；新增根 `.env.example` 与 `deploy/.env.example` 模板；`deploy/.env`（含真实密码）本就不在 git 跟踪内（`.gitignore` 覆盖 `.env`），保留本地不再入库。
+- 验证：全量 `mvn test` 277 例通过（0 失败），较切片 31 新增 24 例：`KeyProviderTest` 10 例（fail-fast、环境变量密钥、JDK keytool 生成的 JKS 多 keyId 装配/覆盖/回退/错误密码）、`PushSecretAuthenticationFilterTest` 7 例、`PackageReceiveAuthIntegrationTest` 4 例（真实过滤器链 401/放行）、`PushServiceTest` 3 例（JDK HttpServer 捕获请求头）；`KeyRotationServiceTest` 7 例不受影响仍通过。prod fail-fast 以真实 jar 启动验证（EXIT=1，日志出现"签名密钥缺失"指引）。E2E 更新为携带共享密钥推送并新增未认证推送 401 负例（Step 5c），12 步全部通过。`docker compose config` 语法校验通过，且缺失必填密钥时报错带中文指引。
+- 遗留事项：达梦/prod 拓扑下 KeyStore 文件挂载路径的部署演练随切片 33/34 Docker E2E 覆盖。
 
 ### 切片 33：Runtime 闭环与可靠性
 

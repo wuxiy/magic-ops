@@ -1,4 +1,7 @@
-version: "3.8"
+# MagicOps 本地/演示部署编排。
+# 切片 32 起所有密钥与密码不再硬编码，统一从 .env（或环境）注入，
+# 请先复制 .env.example 为 .env 并填写真实值：cp .env.example .env
+name: magicops
 
 services:
   postgres:
@@ -7,7 +10,7 @@ services:
     environment:
       POSTGRES_DB: magicops
       POSTGRES_USER: magicops
-      POSTGRES_PASSWORD: magicops
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?请在 .env 中配置 DB_PASSWORD}
     ports:
       - "5432:5432"
     volumes:
@@ -32,11 +35,15 @@ services:
       DB_PORT: 5432
       DB_NAME: magicops
       DB_USERNAME: magicops
-      DB_PASSWORD: magicops
-      CONSOLE_ADMIN_PASSWORD: magicops-admin
-      MAGICOPS_KEY_ID: magicops-default
+      DB_PASSWORD: ${DB_PASSWORD:?请在 .env 中配置 DB_PASSWORD}
+      MAGICOPS_ADMIN_PASSWORD: ${MAGICOPS_ADMIN_PASSWORD:?请在 .env 中配置管理员密码 MAGICOPS_ADMIN_PASSWORD}
+      # 签名密钥：prod fail-fast，缺失时启动失败。可用 KeyPairGeneratorUtil 生成
+      MAGICOPS_PRIVATE_KEY: ${MAGICOPS_PRIVATE_KEY:?请在 .env 中配置签名私钥 MAGICOPS_PRIVATE_KEY}
+      MAGICOPS_PUBLIC_KEY: ${MAGICOPS_PUBLIC_KEY:?请在 .env 中配置签名公钥 MAGICOPS_PUBLIC_KEY}
+      MAGICOPS_KEY_ID: ${MAGICOPS_KEY_ID:-magicops-default}
+      # Console 到 Runtime 的推送共享密钥
+      MAGICOPS_RUNTIME_SHARED_SECRET: ${MAGICOPS_RUNTIME_SHARED_SECRET:?请在 .env 中配置 MAGICOPS_RUNTIME_SHARED_SECRET}
       MAGICOPS_ENVIRONMENT: development
-      MAGICOPS_ADMIN_PASSWORD: magicops-admin
       RUNTIME_URL: http://runtime:8081
     ports:
       - "8080:8080"
@@ -55,8 +62,16 @@ services:
       DB_PORT: 5432
       DB_NAME: magicops
       DB_USERNAME: magicops
-      DB_PASSWORD: magicops
-      MAGICOPS_KEY_ID: magicops-default
+      DB_PASSWORD: ${DB_PASSWORD:?请在 .env 中配置 DB_PASSWORD}
+      # Runtime 验签使用与 Console 相同的密钥材料
+      MAGICOPS_PRIVATE_KEY: ${MAGICOPS_PRIVATE_KEY:?请在 .env 中配置签名私钥 MAGICOPS_PRIVATE_KEY}
+      MAGICOPS_PUBLIC_KEY: ${MAGICOPS_PUBLIC_KEY:?请在 .env 中配置签名公钥 MAGICOPS_PUBLIC_KEY}
+      MAGICOPS_KEY_ID: ${MAGICOPS_KEY_ID:-magicops-default}
+      # 收包端点共享密钥（与 Console 一致），prod 下缺失时收包 fail-closed
+      MAGICOPS_RUNTIME_SHARED_SECRET: ${MAGICOPS_RUNTIME_SHARED_SECRET:?请在 .env 中配置 MAGICOPS_RUNTIME_SHARED_SECRET}
+      # Runtime Basic 认证凭据（查询/修复 API）
+      RUNTIME_USERNAME: ${RUNTIME_USERNAME:-runtime}
+      RUNTIME_PASSWORD: ${RUNTIME_PASSWORD:?请在 .env 中配置 RUNTIME_PASSWORD}
       MAGICOPS_ENVIRONMENT: development
     ports:
       - "8081:8081"

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # MagicOps E2E 闭环测试脚本
-# 验证：创建脚本 → 调试 → 提交 → 自审自批拒绝（切片 31）→ 审批 → 签名 → 推送 → Runtime 验签加载 → 执行 → 审计
+# 验证：创建脚本 → 调试 → 提交 → 自审自批拒绝（切片 31）→ 审批 → 签名 → 推送（共享密钥认证，切片 32）→ Runtime 验签加载 → 执行 → 审计
 #
 # 前置条件：
 #   1. mvn install -DskipTests 已完成
@@ -46,7 +46,9 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
 step "生成共享 RSA 密钥对"
 eval "$(java -cp "$PROJECT_ROOT/magicops-sign/target/classes" top.cywu.magicops.sign.key.KeyPairGeneratorUtil)"
 export MAGICOPS_ENVIRONMENT="development"
+export MAGICOPS_RUNTIME_SHARED_SECRET="e2e-push-secret-$RANDOM$RANDOM"
 echo "Key ID: $MAGICOPS_KEY_ID"
+echo "Push secret configured (Console 与 Runtime 共用)"
 
 # 2. 启动 Console 和 Runtime
 step "启动 Console ($CONSOLE_PORT) 和 Runtime ($RUNTIME_PORT)"
@@ -111,7 +113,13 @@ if [ "$DECISION" = "APPROVED" ]; then pass "Approved by approver"; else fail "Ap
 STATUS=$(curl -s -u $AUTH "$CONSOLE_URL/api/scripts/$SCRIPT_ID" | python3 -c "import sys,json; print(json.load(sys.stdin)['status'])")
 if [ "$STATUS" = "APPROVED" ]; then pass "Script status: APPROVED"; else fail "Expected APPROVED, got $STATUS"; fi
 
-step "Step 6+7: 构建签名 + 推送发布包到 Runtime"
+step "Step 5c: 未携带共享密钥的推送被拒绝 (切片 32, 401)"
+HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -X POST "$RUNTIME_URL/api/packages" \
+  -H "Content-Type: application/json" \
+  -d '{"manifest":{}}')
+if [ "$HTTP_CODE" = "401" ]; then pass "Unauthenticated push rejected: HTTP 401"; else fail "Expected 401 for push without secret, got HTTP $HTTP_CODE"; fi
+
+step "Step 6+7: 构建签名 + 推送发布包到 Runtime (携带共享密钥)"
 PUBLISH_RESP=$(curl -s -u $AUTH -X POST "$CONSOLE_URL/api/scripts/publish" \
   -H "Content-Type: application/json" \
   -d "{\"scriptIds\":[$SCRIPT_ID],\"environment\":\"development\"}")

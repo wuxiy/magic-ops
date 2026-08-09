@@ -15,6 +15,23 @@ spring:
       minimum-idle: 2
       idle-timeout: 300000
       connection-timeout: 30000
+  # 生产 Basic 认证凭据外置（切片 32）：密码必须显式提供，禁止使用默认值
+  security:
+    user:
+      name: ${RUNTIME_USERNAME:runtime}
+      password: ${RUNTIME_PASSWORD:?生产环境必须提供 RUNTIME_PASSWORD}
+
+# 切片 32：推送共享密钥外置；prod 下未配置时收包端点 fail-closed（401）
+magicops:
+  runtime:
+    push-secret: ${MAGICOPS_RUNTIME_SHARED_SECRET:}
+  sign:
+    # 生产环境禁止临时签名密钥：缺失密钥时启动 fail-fast
+    allow-ephemeral-keys: false
+    keystore:
+      path: ${MAGICOPS_KEYSTORE_PATH:}
+      password: ${MAGICOPS_KEYSTORE_PASSWORD:}
+      type: ${MAGICOPS_KEYSTORE_TYPE:JKS}
 
 logging:
   level:

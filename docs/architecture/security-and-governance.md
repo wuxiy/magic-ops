@@ -61,12 +61,13 @@
 
 第一版数据修复约束：
 
-- 仅支持达梦数据库业务数据源；
+- 目标业务库第一版为达梦（H2/PostgreSQL 用于开发与验证）；
 - 不允许自由 UPDATE/DELETE；
 - 只允许受限 SQL 模板，或单表带主键/WHERE 的写操作；
 - dry-run 第一版只做 SQL 解析、权限校验、危险语句拦截和影响范围估算；
-- 第一版不承诺事务内执行后 rollback；
-- 事务内执行后 rollback 可在达梦行为被测试覆盖后再升级。
+- 自第五阶段切片 30 起，修复在事务内执行：影响行数超过 `MAX_AFFECTED_ROWS`（100）即回滚并落阻断审计；
+- SQL Guard 基于 JSQLParser 解析树分类（切片 30），不再使用字符串前缀匹配；
+- 达梦方言行为仍需抽样验证（见第五阶段遗留事项）。
 
 ## 加解密与密钥安全
 
@@ -75,6 +76,13 @@
 - Runtime 或配置的 key service 解析真实密钥。
 - 日志和审计不得记录原始 key、token、password、database URL、private key 或解密后的敏感 payload。
 - 第一阶段加解密支持围绕接口适配需求：SM4、AES、RSA、HMAC 和脱敏。
+
+签名密钥装配（第五阶段切片 32 起）：
+
+- 装配优先级：KeyStore 持久化密钥（JDK 标准 `java.security.KeyStore`，JKS/PKCS12，`magicops.sign.keystore.*`）→ 环境变量（`MAGICOPS_PRIVATE_KEY/PUBLIC_KEY`）→ 临时密钥（仅 `magicops.sign.allow-ephemeral-keys=true`）；
+- prod profile 强制 `allow-ephemeral-keys: false`：无任何持久化密钥时启动 fail-fast，错误信息附修复路径；
+- KeyStore 模式下全部别名进入信任集，支持密钥轮换过渡期内新旧 keyId 共存验签；
+- 仓库内不落真实凭据：compose 一律 `${VAR:?}` 必填引用，凭据经 `.env`（不入库）注入，仓库只保留 `.env.example` 模板。
 
 ## 审计可靠性
 
@@ -118,6 +126,6 @@
 
 - Console 只部署在管理网或运维网。
 - Runtime 部署在业务网或生产网。
-- Console 通过认证通道向 Runtime 推送已签名发布包。
+- Console 通过认证通道向 Runtime 推送已签名发布包。自第五阶段切片 32 起，收包端点强制共享密钥认证（`X-MagicOps-Push-Secret`，环境变量 `MAGICOPS_RUNTIME_SHARED_SECRET`）：缺失或不匹配返回 401；prod 未配置密钥时 fail-closed 拒绝所有推送。
 - Runtime 不得暴露编辑端点。
 - Arthas Tunnel 不得公网暴露，且属于第二阶段。

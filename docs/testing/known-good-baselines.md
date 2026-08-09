@@ -16,6 +16,18 @@
 
 ## 最近完整验证
 
+2026-08-08：第五阶段切片 32（密钥与凭据固化）
+
+- `mvn test`：通过（277 个测试，0 失败，较切片 31 新增 24 例）
+  - KeyProviderTest 10 例（prod fail-fast、环境变量密钥、JDK keytool 生成 JKS 的多 keyId 装配/覆盖/回退/错误密码）
+  - PushSecretAuthenticationFilterTest 7 例（401 拒绝/放行/GET 不受影响）
+  - PackageReceiveAuthIntegrationTest 4 例（真实 Spring Security 过滤器链）
+  - PushServiceTest 3 例（JDK HttpServer 验证共享密钥头）
+- prod fail-fast 真实 jar 启动验证：缺密钥时 EXIT=1，错误信息含两种修复路径。
+- E2E 闭环测试 12 步全部通过（新增 Step 5c 未认证推送 401 负例；推送链路携带共享密钥）。
+- 凭据出库：根 compose 全部密码改为必填环境变量引用，新增根与 deploy 的 `.env.example`；`docker compose config` 校验通过。
+- 实现原则：仅用 JDK 标准 KeyStore 与 Spring Security/Boot 标准机制，未新增第三方依赖。
+
 2026-08-08：第五阶段切片 31（身份与追责）
 
 - `mvn test`：通过（253 个测试，0 失败，较切片 30 新增 10 例）
