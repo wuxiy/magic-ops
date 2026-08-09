@@ -2,7 +2,7 @@
 
 ## 当前基线
 
-截至 2026-07-11 的已知良好状态：
+截至 2026-08-09 复核的已知良好状态：
 
 **第一阶段（切片 0-5）**：项目脚手架、脚本生命周期、签名验签、动态查询、数据修复、HTTP 适配、E2E 10 步闭环。
 
@@ -12,9 +12,23 @@
 
 **第三阶段（切片 17）**：文档全量同步、Arthas 诊断中心需求与架构设计、magicops-diagnosis 模块骨架。
 
-**测试**：148 个单元测试全部通过。
+**第五阶段（切片 30-32）**：SQL Guard 解析器化与数据修复事务化强制、身份与追责（actor 绑定登录用户、提交人/审批人分离、prod 禁测试账号）、密钥与凭据固化（prod fail-fast、KeyStore 装配、收包共享密钥认证）。
+
+**测试**：277 个单元测试全部通过（2026-08-09 复核重跑确认）。
 
 ## 最近完整验证
+
+2026-08-09：生产准入复核（独立代码级重审，非仅依据文档）
+
+- `mvn test`：通过（277 个测试，0 失败，12 模块全绿），独立重跑确认切片 32 基线成立。
+- 代码级复核切片 30-32 强制项均已真实落地（非"声明有、强制无"）：
+  - `SqlGuardService` 基于 JSQLParser 解析树分类（非字符串前缀），`TRUNCATE/DROP/ALTER/CREATE/GRANT` 恒拒绝。
+  - `RepairExecutionService` 审批凭据校验 + contentHash 内容绑定 + 表级白名单 + 事务化 `MAX_AFFECTED_ROWS=100` 超限回滚。
+  - `ScriptLifecycleService:167` 提交人≠审批人强制（违例 403）；actor 绑定登录用户。
+  - `KeyProvider` prod fail-fast（禁临时密钥）；`PushSecretAuthenticationFilter` 收包端点 401。
+- 硬阻断确认（切片 33/34 未实现）：激活包仅内存（`PackageVerificationService:44` AtomicReference，重启即丢）、Runtime 执行审计落内存 fallback、`HttpTargetRegistry` 生产不注册、无回滚/下线端点；query/adapter 仍执行请求体内容而非签名包脚本。
+- 修正：前端构建产物现已正确 gitignore（`static/console/` 跟踪数为 0），原"产物直接提交 git"不再成立；但前端仍未纳入 Maven 构建。
+- 仍不完整/未验证：Docker Compose 从未真实 `docker-compose up` + PostgreSQL E2E；达梦方言未抽样验证；无 CI；集成测试全 H2。
 
 2026-08-08：第五阶段切片 32（密钥与凭据固化）
 

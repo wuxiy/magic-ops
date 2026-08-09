@@ -10,6 +10,25 @@
 
 可行的路径是**灰度试运行**：先只开放只读动态查询接口（风险最低），补齐 P0 强制项后再开放数据修复，Arthas 诊断在真实 Tunnel 校准后再上线。
 
+## 2026-08-09 复核更新
+
+本节为 2026-08-09 针对 main 分支的**代码级独立复核**结论（非仅依据文档/计划状态）。下方 A1-A6 仍为 2026-08-07 基线快照，部分条目已被切片 30-32 关闭，状态以本节为准。
+
+**结论不变**：不建议现在整体接入生产做日常运维。硬阻断为切片 33/34 未实现（见下"仍开放"）。
+
+已关闭并代码验证（P0-1/P0-2/P0-3）：
+
+- P0-1 治理强制化（切片 30）：A1 中"数据修复无审批校验""SQL Guard 字符串前缀""行数上限未生效""包元数据权限空转"均已修复。`SqlGuardService` 走 JSQLParser 解析树；`RepairExecutionService` 含审批凭据校验 + contentHash 绑定 + 表白名单 + 事务化 `MAX_AFFECTED_ROWS=100` 回滚；`PackageBuildService` 打包时填充 `datasourcePermissions`/`approvals`。
+- P0-2 身份与追责（切片 31）：A1 中"操作人硬编码""无提交人/审批人分离""prod 仍初始化测试账号"均已修复。`ScriptLifecycleService:167` 强制提交人≠审批人；actor 绑定 SecurityContext 登录用户；`DataInitializer` prod 分支不建测试账号；新增角色回收端点。
+- P0-3 密钥与凭据固化（切片 32）：A3 中"生产签名密钥可能为临时密钥""根 compose 硬编码密码""prod 仍初始化测试账号"已修复。`KeyProvider` prod fail-fast 禁临时密钥；收包端点 `PushSecretAuthenticationFilter` 401；凭据外部化为 `${VAR:?}` 必填引用 + `.env.example`。
+
+仍开放（硬阻断，上线前必须解决）：
+
+- P0-4 Runtime 闭环（A4）= 切片 33 未实现：激活包仅内存（`PackageVerificationService:44` `AtomicReference`，重启即丢全部激活状态与动态 API）；Runtime 执行审计落内存 fallback（`RuntimeApplication` 无 `@EnableJpaRepositories`/`@EntityScan`，audit Repository 注入 null，`AuditController` 因构造注入被排除扫描）；`HttpTargetRegistry.register()` 生产代码从不调用（Console `http_targets` 表与 Runtime 注册表无同步，HTTP 适配生产必返"目标未注册"）；无回滚/下线端点（Runtime 仅 6 个端点）。
+- P0-5 双轨/执行语义（A2）= 切片 34 未实现：repair 已有 contentHash 绑定，但 `query` 与 `adapter/execute` 仍执行请求体里的 SQL/target/path（`HttpAdapterController:28` 直接取请求体字段执行），签名包仅被检查"是否存在激活包"，未对齐"生产执行必须走签名发布链路"的安全模型。
+
+修正（A6）：前端构建产物现已正确 gitignore（`.gitignore` 覆盖 `magicops-console/src/main/resources/static/console/`，git 跟踪数为 0），原"前端构建产物直接提交 git"不再成立；但"前端未纳入 Maven 构建（无 frontend-maven-plugin）"仍成立。其余 A5（可观测）、A6（无 CI、集成测试全 H2、无达梦验证、Docker Compose 未真实跑）仍开放。
+
 ## A. 阻断性缺口（上线前必须解决）
 
 ### A1 治理强制断点（保护区）
