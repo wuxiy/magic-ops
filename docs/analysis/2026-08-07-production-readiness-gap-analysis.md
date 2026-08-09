@@ -88,7 +88,7 @@ magic-editor（magic-api 原生）与 MagicOps 脚本生命周期是两条独立
 - `deploy/` 仅 Console 单容器，无 Runtime 服务定义。
 - 前端构建未纳入 Maven（无 frontend-maven-plugin），构建产物直接提交 git。
 - 无 CI；无达梦真实验证记录（只有 compose 文件）；集成测试全基于 H2，无 Testcontainers/真实 PostgreSQL。
-（切片 36 已建 DataSourceController CRUD + Runtime DataSourceSyncService）数据源管理 API 已建，DynamicDataSourceManager 可从 data_sources 同步业务库；原"只有实体无 Controller"已解决。/ 项目/环境管理仍只有实体无 Controller，`DynamicDataSourceManager` 默认硬编码 H2——日常运营接入业务数据源的前置能力缺失。
+（切片 36-37）数据源管理 API 已建 + 发布包声明目标数据源 + Query/Repair 按声明路由，只读灰度本体完成。/ 项目/环境管理仍只有实体无 Controller，`DynamicDataSourceManager` 默认硬编码 H2——日常运营接入业务数据源的前置能力缺失。
 - known-good-baselines 停在 2026-07-11，多份文档状态落后于代码（混合 UI 计划、Arthas 需求、backlog）。
 
 ## B. 优化路线（按优先级）

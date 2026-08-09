@@ -41,6 +41,10 @@ public class ScriptVersionEntity {
     @Column(name = "content_hash", length = 64)
     private String contentHash;
 
+    /** 脚本声明的目标数据源名称（切片 37）。默认 default，保持既有脚本兼容。 */
+    @Column(name = "datasource", nullable = false, length = 100)
+    private String datasource = "default";
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
@@ -73,6 +77,9 @@ public class ScriptVersionEntity {
 
     public String getContentHash() { return contentHash; }
     public void setContentHash(String contentHash) { this.contentHash = contentHash; }
+
+    public String getDatasource() { return datasource; }
+    public void setDatasource(String datasource) { this.datasource = datasource; }
 
     public Instant getCreatedAt() { return createdAt; }
     public void setCreatedAt(Instant createdAt) { this.createdAt = createdAt; }

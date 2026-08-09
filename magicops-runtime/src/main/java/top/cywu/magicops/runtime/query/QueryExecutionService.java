@@ -68,17 +68,53 @@ public class QueryExecutionService {
      * @return 执行结果
      */
     public QueryExecutionResult executeQuery(PublishPackage pkg, String sql, String traceId, String dataSourceName) {
+        return executeQueryInternal(pkg, sql, traceId, dataSourceName, null);
+    }
+
+    /**
+     * 按脚本声明的数据源路由执行查询（切片 37）。
+     *
+     * <p>从发布包 metadata 的 {@code scriptDatasource} 解析该脚本声明的数据源，
+     * 校验该数据源在 {@code datasourcePermissions} 授权范围内后路由执行。
+     * 无 {@code scriptDatasource} 元数据时回退 default（遗留包兼容）。
+     *
+     * @param pkg      已验签的发布包
+     * @param sql      要执行的 SQL
+     * @param traceId  追踪 ID
+     * @param scriptId 脚本 ID（解析声明数据源）
+     * @return 执行结果
+     */
+    public QueryExecutionResult executeQuery(PublishPackage pkg, String sql, String traceId, String scriptId,
+                                             boolean routeByScript) {
+        String datasource = resolveScriptDatasource(pkg, scriptId);
+        return executeQueryInternal(pkg, sql, traceId, datasource, scriptId);
+    }
+
+    private QueryExecutionResult executeQueryInternal(PublishPackage pkg, String sql, String traceId,
+                                                     String dataSourceName, String scriptId) {
         long startTime = System.currentTimeMillis();
 
         // 从发布包中查找脚本信息
-        var scriptEntry = pkg.manifest().scripts().stream()
-                .filter(s -> s.path() != null)
-                .findFirst()
-                .orElse(null);
+        var scriptEntry = (scriptId != null)
+                ? pkg.manifest().scripts().stream()
+                        .filter(s -> scriptId.equals(s.scriptId())).findFirst().orElse(null)
+                : pkg.manifest().scripts().stream()
+                        .filter(s -> s.path() != null).findFirst().orElse(null);
 
-        String scriptId = scriptEntry != null ? scriptEntry.scriptId() : "unknown";
+        String resolvedScriptId = scriptEntry != null ? scriptEntry.scriptId() : "unknown";
         String scriptVersion = scriptEntry != null ? scriptEntry.version() : "unknown";
         String sqlSummary = sqlGuardService.summarize(sql);
+
+        // 切片 37：校验数据源在发布包授权范围内（按脚本路由时）
+        if (scriptId != null) {
+            String dsViolation = checkDatasourcePermission(pkg, dataSourceName);
+            if (dsViolation != null) {
+                QueryExecutionResult result = QueryExecutionResult.failure(
+                        traceId, resolvedScriptId, scriptVersion, sqlSummary, elapsed(startTime), dsViolation);
+                writeExecutionAudit(pkg, result);
+                return result;
+            }
+        }
 
         try {
             // 1. SQL Guard 校验
@@ -86,16 +122,16 @@ public class QueryExecutionService {
             if (!guardResult.allowed()) {
                 String errorMsg = "SQL Guard 拒绝: " + guardResult.reason();
                 QueryExecutionResult result = QueryExecutionResult.failure(
-                        traceId, scriptId, scriptVersion, sqlSummary, elapsed(startTime), errorMsg);
+                        traceId, resolvedScriptId, scriptVersion, sqlSummary, elapsed(startTime), errorMsg);
                 writeExecutionAudit(pkg, result);
                 return result;
             }
 
-            // 2. 表级白名单校验（切片 30）：SQL 引用的表必须在发布包授权范围内
-            String tableViolation = checkTablePermissions(pkg, sql);
+            // 2. 表级白名单校验（切片 30/37）：SQL 引用的表必须在当前数据源授权范围内
+            String tableViolation = checkTablePermissions(pkg, sql, dataSourceName);
             if (tableViolation != null) {
                 QueryExecutionResult result = QueryExecutionResult.failure(
-                        traceId, scriptId, scriptVersion, sqlSummary, elapsed(startTime), tableViolation);
+                        traceId, resolvedScriptId, scriptVersion, sqlSummary, elapsed(startTime), tableViolation);
                 writeExecutionAudit(pkg, result);
                 return result;
             }
@@ -106,7 +142,7 @@ public class QueryExecutionService {
 
             if (!queryResult.success()) {
                 QueryExecutionResult result = QueryExecutionResult.failure(
-                        traceId, scriptId, scriptVersion, sqlSummary, elapsed(startTime), queryResult.errorMessage());
+                        traceId, resolvedScriptId, scriptVersion, sqlSummary, elapsed(startTime), queryResult.errorMessage());
                 writeExecutionAudit(pkg, result);
                 return result;
             }
@@ -115,32 +151,74 @@ public class QueryExecutionService {
             int resultSize = queryResult.rowCount();
 
             QueryExecutionResult result = QueryExecutionResult.success(
-                    traceId, scriptId, scriptVersion, sqlSummary, resultSize, elapsed(startTime));
+                    traceId, resolvedScriptId, scriptVersion, sqlSummary, resultSize, elapsed(startTime));
 
             // 5. 写入执行审计
             writeExecutionAudit(pkg, result);
 
-            log.info("query_executed traceId={} scriptId={} resultSize={} durationMs={}",
-                    traceId, scriptId, resultSize, result.durationMs());
+            log.info("query_executed traceId={} scriptId={} datasource={} resultSize={} durationMs={}",
+                    traceId, resolvedScriptId, dataSourceName, resultSize, result.durationMs());
             return result;
 
         } catch (Exception e) {
             QueryExecutionResult result = QueryExecutionResult.failure(
-                    traceId, scriptId, scriptVersion, sqlSummary, elapsed(startTime), e.getMessage());
+                    traceId, resolvedScriptId, scriptVersion, sqlSummary, elapsed(startTime), e.getMessage());
             writeExecutionAudit(pkg, result);
             throw e;
         }
     }
 
     /**
-     * 校验 SQL 引用的表在发布包授权范围内（fail-closed）。
+     * 从发布包 metadata 解析脚本声明的数据源（切片 37）。
+     * 无 {@code scriptDatasource} 元数据时回退 default（遗留包兼容）。
+     */
+    private String resolveScriptDatasource(PublishPackage pkg, String scriptId) {
+        if (scriptId == null) {
+            return DEFAULT_DATASOURCE;
+        }
+        Object mapping = pkg.metadata() != null ? pkg.metadata().get("scriptDatasource") : null;
+        if (mapping instanceof Map<?, ?> m) {
+            Object ds = m.get(scriptId);
+            if (ds != null && !String.valueOf(ds).isBlank()) {
+                return String.valueOf(ds);
+            }
+        }
+        return DEFAULT_DATASOURCE;
+    }
+
+    /**
+     * 校验数据源在发布包 {@code datasourcePermissions} 授权范围内（切片 37）。
+     * 无授权声明时回退 default 放行（遗留包兼容）。
+     *
+     * @return 违规说明；通过时返回 null
+     */
+    private String checkDatasourcePermission(PublishPackage pkg, String datasource) {
+        Object permsObj = pkg.metadata() != null
+                ? pkg.metadata().get("datasourcePermissions") : null;
+        if (!(permsObj instanceof List<?> perms)) {
+            return null; // 遗留包无声明，放行
+        }
+        for (Object item : perms) {
+            if (item instanceof Map<?, ?> perm
+                    && datasource.equals(String.valueOf(perm.get("datasource")))) {
+                return null; // 命中授权
+            }
+        }
+        return "数据源 " + datasource + " 不在发布包授权范围内";
+    }
+
+    /**
+     * 校验 SQL 引用的表在指定数据源授权范围内（fail-closed）。
      *
      * <p>metadata 无 {@code datasourcePermissions} 时按遗留包放行并告警；
      * 存在授权声明时严格校验。
      *
+     * @param pkg        发布包
+     * @param sql        待校验 SQL
+     * @param datasource 目标数据源（切片 37：按数据源取授权表清单）
      * @return 违规说明；通过时返回 null
      */
-    private String checkTablePermissions(PublishPackage pkg, String sql) {
+    private String checkTablePermissions(PublishPackage pkg, String sql, String datasource) {
         Object permsObj = pkg.metadata() != null
                 ? pkg.metadata().get("datasourcePermissions") : null;
         if (!(permsObj instanceof List<?> perms)) {
@@ -152,7 +230,7 @@ public class QueryExecutionService {
         List<String> allowed = List.of();
         for (Object item : perms) {
             if (item instanceof Map<?, ?> perm
-                    && DEFAULT_DATASOURCE.equals(String.valueOf(perm.get("datasource")))
+                    && datasource.equals(String.valueOf(perm.get("datasource")))
                     && perm.get("tables") instanceof List<?> tableList) {
                 allowed = tableList.stream().map(String::valueOf).toList();
                 break;

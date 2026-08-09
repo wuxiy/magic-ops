@@ -63,7 +63,7 @@ public class QueryController {
         }
 
         QueryExecutionResult result = queryExecutionService.executeQuery(
-                activePackage, resolved.contentAsString(), traceId);
+                activePackage, resolved.contentAsString(), traceId, scriptId, true);
         return ResponseEntity.ok(result);
     }
 }

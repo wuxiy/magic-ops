@@ -83,6 +83,9 @@ public class RepairExecutionService {
         String scriptId = scriptEntry != null ? scriptEntry.scriptId() : "unknown";
         String scriptVersion = scriptEntry != null ? scriptEntry.version() : "unknown";
 
+        // 切片 37：按脚本声明的数据源路由（无声明时回退 default）
+        String datasource = resolveScriptDatasource(pkg, scriptId);
+
         // 1. 验证 dry-run 已完成
         if (dryRunReport == null || !dryRunReport.safe()) {
             String errorMsg = "无有效 dry-run 报告，不允许执行修复";
@@ -122,8 +125,8 @@ public class RepairExecutionService {
             return result;
         }
 
-        // 5. 表级白名单：SQL 引用的表必须在发布包授权范围内
-        String tableViolation = checkTablePermissions(pkg, sql);
+        // 5. 表级白名单：SQL 引用的表必须在当前数据源授权范围内
+        String tableViolation = checkTablePermissions(pkg, sql, datasource);
         if (tableViolation != null) {
             RepairResult result = RepairResult.failure(traceId, scriptId, scriptVersion,
                     elapsed(startTime), tableViolation, dryRunReport);
@@ -135,7 +138,7 @@ public class RepairExecutionService {
             // 6. 事务化执行修复 SQL，影响行数超限自动回滚
             DynamicDataSourceManager.QueryResult queryResult =
                     dataSourceManager.executeUpdateInTransaction(
-                            DEFAULT_DATASOURCE, sql, null, MAX_AFFECTED_ROWS);
+                            datasource, sql, null, MAX_AFFECTED_ROWS);
 
             if (!queryResult.success()) {
                 RepairResult result = RepairResult.failure(traceId, scriptId, scriptVersion,
@@ -206,14 +209,32 @@ public class RepairExecutionService {
     }
 
     /**
-     * 校验 SQL 引用的表在发布包授权范围内。
+     * 从发布包 metadata 解析脚本声明的数据源（切片 37）。
+     * 无 {@code scriptDatasource} 元数据时回退 default（遗留包兼容）。
+     */
+    private String resolveScriptDatasource(PublishPackage pkg, String scriptId) {
+        if (scriptId == null || "unknown".equals(scriptId)) {
+            return DEFAULT_DATASOURCE;
+        }
+        Object mapping = pkg.metadata() != null ? pkg.metadata().get("scriptDatasource") : null;
+        if (mapping instanceof Map<?, ?> m) {
+            Object ds = m.get(scriptId);
+            if (ds != null && !String.valueOf(ds).isBlank()) {
+                return String.valueOf(ds);
+            }
+        }
+        return DEFAULT_DATASOURCE;
+    }
+
+    /**
+     * 校验 SQL 引用的表在指定数据源授权范围内。
      *
      * <p>metadata 无 {@code datasourcePermissions} 时按遗留包放行并告警；
      * 存在授权声明时严格校验（fail-closed）。
      *
      * @return 违规说明；通过时返回 null
      */
-    private String checkTablePermissions(PublishPackage pkg, String sql) {
+    private String checkTablePermissions(PublishPackage pkg, String sql, String datasource) {
         Object permsObj = pkg.metadata() != null
                 ? pkg.metadata().get(METADATA_DATASOURCE_PERMISSIONS) : null;
         if (!(permsObj instanceof List<?> perms)) {
@@ -222,7 +243,7 @@ public class RepairExecutionService {
             return null;
         }
 
-        List<String> allowed = allowedTables(perms, DEFAULT_DATASOURCE);
+        List<String> allowed = allowedTables(perms, datasource);
         List<String> referenced = sqlGuardService.tablesIn(sql);
         for (String table : referenced) {
             if (!containsIgnoreCase(allowed, table)) {

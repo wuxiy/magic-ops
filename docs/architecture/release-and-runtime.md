@@ -133,6 +133,7 @@ Runtime 执行端点（`/api/query`、`/api/repair/*`、`/api/adapter/execute`�
 - 请求只携带 `scriptId`（查询/修复）或 `scriptId` + `body`（适配），不携带裸 SQL/裸目标。
 - `ScriptResolver` 按 `scriptId` 从激活包 manifest 查 `ScriptEntry`、从 `pkg.scripts()` 取脚本内容、校验 contentHash，返回解析后的内容。
 - 执行内容来自已签名发布包：查询/修复执行包内脚本内容（SQL），适配执行包内脚本定义的 `{targetId,path,method}` + 请求 body。
+- 脚本在发布包中声明目标数据源（metadata `scriptDatasource` + `datasourcePermissions`，随包签名）：Query/Repair 按脚本声明的数据源路由，校验数据源在授权范围内 + 表在该数据源授权表清单内再执行，使灰度查询可指向真实业务库（切片 37）。
 - 缺 `scriptId` 的裸 SQL/裸目标请求一律 400 拒绝。magic-editor 保留调试能力，但生产执行必须走发布链路（双轨决策方向 A）。
 
 ## 回滚与下线

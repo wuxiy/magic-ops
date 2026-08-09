@@ -71,7 +71,10 @@ public class PackageBuildService {
         Map<String, byte[]> scripts = new LinkedHashMap<>();
         Map<String, Object> metadata = new LinkedHashMap<>();
         List<Map<String, Object>> approvalProofs = new ArrayList<>();
-        Set<String> referencedTables = new TreeSet<>();
+        // 切片 37：按数据源分组的表授权。key=数据源名，value=该数据源授权的表集合。
+        Map<String, java.util.Set<String>> tablesByDatasource = new LinkedHashMap<>();
+        // 脚本声明的数据源清单（用于填充 datasourcePermissions，即使无表引用也要声明数据源）
+        Map<String, String> scriptDatasource = new LinkedHashMap<>();
 
         for (Long scriptId : scriptIds) {
             ScriptEntity script = scriptRepository.findById(scriptId)
@@ -85,10 +88,16 @@ public class PackageBuildService {
             // 审批凭据（fail-closed）：无 APPROVED 审批记录不允许打包
             approvalProofs.add(buildApprovalProof(script, version));
 
-            // 表级授权：从脚本 SQL 提取引用表（仅 SQL 类脚本）
+            // 切片 37：脚本声明的目标数据源（默认 default）
+            String dsName = version.getDatasource() != null && !version.getDatasource().isBlank()
+                    ? version.getDatasource() : DEFAULT_DATASOURCE;
+            scriptDatasource.put(String.valueOf(script.getId()), dsName);
+
+            // 表级授权：从脚本 SQL 提取引用表，归入该脚本声明的数据源（仅 SQL 类脚本）
             if (script.getScriptType() == ScriptType.DYNAMIC_QUERY
                     || script.getScriptType() == ScriptType.DATA_REPAIR) {
-                referencedTables.addAll(extractDeclaredTables(script, version));
+                tablesByDatasource.computeIfAbsent(dsName, k -> new TreeSet<>())
+                        .addAll(extractDeclaredTables(script, version));
             }
 
             String path = version.getRoutePath();
@@ -108,9 +117,22 @@ public class PackageBuildService {
             scripts.put(path, normalizedContent);
         }
 
-        // 构建 metadata（治理凭据随包签名）
-        metadata.put("datasourcePermissions", List.of(
-                Map.of("datasource", DEFAULT_DATASOURCE, "tables", new ArrayList<>(referencedTables))));
+        // 切片 37：datasourcePermissions 按数据源分组（脚本声明的数据源 -> 授权表集合）。
+        // 即使某数据源无表引用（如纯表达式查询），也声明该数据源，供 Runtime 路由。
+        List<Map<String, Object>> datasourcePerms = new ArrayList<>();
+        Set<String> declaredDatasources = new TreeSet<>(scriptDatasource.values());
+        for (String ds : declaredDatasources) {
+            Set<String> tables = tablesByDatasource.getOrDefault(ds, new TreeSet<>());
+            datasourcePerms.add(Map.of(
+                    "datasource", ds,
+                    "tables", new ArrayList<>(tables)));
+        }
+        if (datasourcePerms.isEmpty()) {
+            datasourcePerms.add(Map.of("datasource", DEFAULT_DATASOURCE, "tables", List.of()));
+        }
+        metadata.put("datasourcePermissions", datasourcePerms);
+        // 脚本 -> 声明数据源映射，供 Runtime 按脚本解析路由数据源
+        metadata.put("scriptDatasource", scriptDatasource);
         metadata.put("httpTargetPermissions", List.of());
         metadata.put("keyRefPermissions", List.of());
         metadata.put("approvals", approvalProofs);

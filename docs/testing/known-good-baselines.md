@@ -12,11 +12,19 @@
 
 **第三阶段（切片 17）**：文档全量同步、Arthas 诊断中心需求与架构设计、magicops-diagnosis 模块骨架。
 
-**第五阶段（切片 30-35）**：SQL Guard 解析器化与数据修复事务化强制、身份与追责、密钥与凭据固化、Runtime 闭环（激活包持久化与启动重载、Runtime 审计持久化、HttpTarget 从 DB 同步、发布下线端点）、执行语义对齐（脚本引用模式，拒绝裸 SQL/裸目标调用）、可观测（actuator+Prometheus+结构化日志+Console 限流/traceId）+ CI；业务数据源管理 API + Runtime 数据源同步（只读灰度前置）。
+**第五阶段（切片 30-35）**：SQL Guard 解析器化与数据修复事务化强制、身份与追责、密钥与凭据固化、Runtime 闭环（激活包持久化与启动重载、Runtime 审计持久化、HttpTarget 从 DB 同步、发布下线端点）、执行语义对齐（脚本引用模式，拒绝裸 SQL/裸目标调用）、可观测（actuator+Prometheus+结构化日志+Console 限流/traceId）+ CI；业务数据源管理 API + Runtime 数据源同步（只读灰度前置）；只读灰度本体（发布包声明目标数据源 + Query/Repair 按声明路由）。
 
-**测试**：301 个单元测试全部通过（2026-08-09 切片 36 关闭复核）。
+**测试**：304 个单元测试全部通过（2026-08-09 切片 37 关闭复核）。
 
 ## 最近完整验证
+
+2026-08-09：切片 37 只读灰度本体（数据源声明路由）
+
+- `mvn test`：通过（304 个测试，0 失败，12 模块全绿），较切片 36 基线 301 新增 3 例（QueryDatasourceRoutingTest）。
+- ScriptVersionEntity 增 datasource 列（V11 迁移）；PackageBuildService 按脚本填充 datasourcePermissions + scriptDatasource。
+- QueryExecutionService/RepairExecutionService 按脚本声明的数据源路由：校验数据源在授权范围内 + 表在数据源授权表清单内，再路由执行。
+- Docker E2E on PostgreSQL 16/16 通过（V11 迁移在真实 PG 应用成功，遗留 default 数据源脚本兼容）。
+- 仍待（上线阻断）：达梦方言抽样验证；前端纳入 Maven；多实例限流 Redis。
 
 2026-08-09：切片 36 业务数据源管理 API
 
