@@ -49,7 +49,7 @@ public class SecurityConfig {
         http
             .csrf(csrf -> csrf.disable())
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/actuator/health").permitAll()
+                .requestMatchers("/actuator/health", "/actuator/info", "/actuator/prometheus").permitAll()
                 .requestMatchers("/h2-console/**").permitAll()
                 .requestMatchers("/api/login").permitAll()
                 .anyRequest().authenticated()

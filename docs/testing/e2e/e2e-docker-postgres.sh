@@ -168,6 +168,12 @@ PKG_CNT=$(docker compose exec -T postgres psql -U magicops -d magicops -t \
   -c "SELECT count(*) FROM active_packages WHERE status='ACTIVE'" 2>/dev/null | tr -d '[:space:]' || echo "0")
 if [ "$PKG_CNT" -ge 1 ] 2>/dev/null; then pass "Active package persisted to PostgreSQL: $PKG_CNT row(s)"; else fail "Expected active package row, got: $PKG_CNT"; fi
 
+step "Step 16: actuator/health 真实端点可匿名访问 (切片 35)"
+CONSOLE_H=$(curl -s -o /dev/null -w "%{http_code}" "$CONSOLE_URL/actuator/health")
+RUNTIME_H=$(curl -s -o /dev/null -w "%{http_code}" "$RUNTIME_URL/actuator/health")
+if [ "$CONSOLE_H" = "200" ] && [ "$RUNTIME_H" = "200" ]; then pass "actuator/health up on Console($CONSOLE_H) and Runtime($RUNTIME_H)"; else fail "actuator/health: console=$CONSOLE_H runtime=$RUNTIME_H"; fi
+
+
 # 总结
 echo ""
 echo "============================================"

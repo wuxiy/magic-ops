@@ -28,3 +28,20 @@ magicops:
 logging:
   level:
     top.cywu.magicops: DEBUG
+
+# 可观测：actuator 健康/指标 + Prometheus（切片 35）
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus,metrics
+  endpoint:
+    health:
+      show-details: always
+  metrics:
+    tags:
+      application: ${spring.application.name}
+  prometheus:
+    metrics:
+      export:
+        enabled: true

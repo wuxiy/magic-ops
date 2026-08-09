@@ -12,11 +12,20 @@
 
 **第三阶段（切片 17）**：文档全量同步、Arthas 诊断中心需求与架构设计、magicops-diagnosis 模块骨架。
 
-**第五阶段（切片 30-34）**：SQL Guard 解析器化与数据修复事务化强制、身份与追责、密钥与凭据固化、Runtime 闭环（激活包持久化与启动重载、Runtime 审计持久化、HttpTarget 从 DB 同步、发布下线端点）、执行语义对齐（脚本引用模式，拒绝裸 SQL/裸目标调用）。
+**第五阶段（切片 30-35）**：SQL Guard 解析器化与数据修复事务化强制、身份与追责、密钥与凭据固化、Runtime 闭环（激活包持久化与启动重载、Runtime 审计持久化、HttpTarget 从 DB 同步、发布下线端点）、执行语义对齐（脚本引用模式，拒绝裸 SQL/裸目标调用）、可观测（actuator+Prometheus+结构化日志+Console 限流/traceId）+ CI。
 
-**测试**：292 个单元测试全部通过（2026-08-09 切片 34 关闭复核）。
+**测试**：296 个单元测试全部通过（2026-08-09 切片 35 关闭复核）。
 
 ## 最近完整验证
+
+2026-08-09：切片 35 可观测 + CI
+
+- `mvn test`：通过（296 个测试，0 失败，12 模块全绿），较切片 34 基线 292 新增 4 例（ConsoleActuatorTest 2 + RuntimeActuatorTest 2）。
+- actuator + micrometer-registry-prometheus 接入 Console/Runtime：`/actuator/health`、`/actuator/prometheus`、`/actuator/metrics` 匿名可访问（需显式 `management.prometheus.metrics.export.enabled=true`）。
+- 结构化日志：logback-spring.xml 含 traceId MDC（Console+Runtime）。
+- Console 补 TraceIdFilter + RateLimitFilter（与 Runtime 行为一致）。
+- GitHub Actions CI：push/PR 触发 `mvn -B test`，失败上传 surefire 报告。
+- Docker E2E on PostgreSQL 16/16 通过（新增 Step 16 actuator/health）。
 
 2026-08-09：第五阶段切片 34（执行语义对齐）
 

@@ -74,12 +74,16 @@ magic-editor（magic-api 原生）与 MagicOps 脚本生命周期是两条独立
 
 ### A5 可观测与运维支撑
 
+> 2026-08-09 更新（切片 35）：actuator+micrometer-prometheus 已接入 Console+Runtime（`/actuator/health`、`/actuator/prometheus` 真实端点，需 `management.prometheus.metrics.export.enabled=true`）；logback-spring.xml 结构化日志（含 traceId MDC）；Console 补 TraceIdFilter+RateLimitFilter。诊断会话持久化与 Arthas 真实联调仍开放。
+
 - 无 actuator/micrometer/prometheus；SecurityConfig `permitAll("/actuator/health")` 但端点不存在，Docker healthcheck 打静态页。
 - 无结构化日志（无 logback 配置）；Console 无 traceId/限流过滤器（Runtime 有）。
 - 诊断会话内存态：`diagnosis_sessions/command_templates/command_executions` 三表无代码使用；`cleanupExpiredSessions()` 无 @Scheduled 调用；诊断未接 AuditService；V7 预置的 9 个命令模板运行时不加载。
 - Arthas 默认 simulate-fallback，真实 `ArthasTunnelClient` 未见联调记录。
 
 ### A6 部署与数据
+
+> 2026-08-09 更新（切片 35）：根 docker-compose.yml 已含 Console+Runtime+PostgreSQL 三服务；GitHub Actions CI 已建（push/PR 触发 mvn test）；Docker Compose E2E on PostgreSQL 已通过（16 步）。仍开放：前端未纳入 Maven、达梦真实验证、Testcontainers、业务数据源管理 API（切片 36）。
 
 - `deploy/` 仅 Console 单容器，无 Runtime 服务定义。
 - 前端构建未纳入 Maven（无 frontend-maven-plugin），构建产物直接提交 git。
