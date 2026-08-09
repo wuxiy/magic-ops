@@ -10,6 +10,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import top.cywu.magicops.core.constants.PushProtocol;
 
 import java.io.IOException;
+import java.security.MessageDigest;
 
 /**
  * 发布包推送共享密钥认证过滤器（切片 32）。
@@ -46,7 +47,11 @@ public class PushSecretAuthenticationFilter extends OncePerRequestFilter {
 
         if (!expectedSecret.isEmpty()) {
             String provided = request.getHeader(PushProtocol.PUSH_SECRET_HEADER);
-            if (expectedSecret.equals(provided == null ? "" : provided.trim())) {
+            String providedNorm = provided == null ? "" : provided.trim();
+            // 切片 38：常量时间比较，避免时序侧信道
+            if (MessageDigest.isEqual(
+                    expectedSecret.getBytes(java.nio.charset.StandardCharsets.UTF_8),
+                    providedNorm.getBytes(java.nio.charset.StandardCharsets.UTF_8))) {
                 filterChain.doFilter(request, response);
                 return;
             }

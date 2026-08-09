@@ -55,28 +55,17 @@ public class QueryExecutionService {
      * @return 执行结果
      */
     public QueryExecutionResult executeQuery(PublishPackage pkg, String sql, String traceId) {
-        return executeQuery(pkg, sql, traceId, DEFAULT_DATASOURCE);
+        // 遗留直连路径：default 数据源，不做脚本路由与数据源权限校验（scriptId=null）。
+        // 生产入口 QueryController 走下方 5 参重载（routeByScript=true）。
+        return executeQueryInternal(pkg, sql, traceId, DEFAULT_DATASOURCE, null);
     }
 
     /**
-     * 执行发布包中的查询脚本。
-     *
-     * @param pkg            已验签的发布包
-     * @param sql            要执行的 SQL（从脚本内容中提取）
-     * @param traceId        追踪 ID
-     * @param dataSourceName 数据源名称
-     * @return 执行结果
-     */
-    public QueryExecutionResult executeQuery(PublishPackage pkg, String sql, String traceId, String dataSourceName) {
-        return executeQueryInternal(pkg, sql, traceId, dataSourceName, null);
-    }
-
-    /**
-     * 按脚本声明的数据源路由执行查询（切片 37）。
+     * 按脚本声明的数据源路由执行查询（切片 37，生产入口）。
      *
      * <p>从发布包 metadata 的 {@code scriptDatasource} 解析该脚本声明的数据源，
-     * 校验该数据源在 {@code datasourcePermissions} 授权范围内后路由执行。
-     * 无 {@code scriptDatasource} 元数据时回退 default（遗留包兼容）。
+     * 校验该数据源在 {@code datasourcePermissions} 授权范围内后路由执行（fail-closed）。
+     * 无 {@code scriptDatasource} 元数据时回退 default，但仍须经权限校验。
      *
      * @param pkg      已验签的发布包
      * @param sql      要执行的 SQL
@@ -170,7 +159,11 @@ public class QueryExecutionService {
 
     /**
      * 从发布包 metadata 解析脚本声明的数据源（切片 37）。
-     * 无 {@code scriptDatasource} 元数据时回退 default（遗留包兼容）。
+     *
+     * <p>无 {@code scriptDatasource} 元数据时回退 {@code default}（遗留包路由兼容）。
+     * 注意：回退 {@code default} 后仍须经 {@link #checkDatasourcePermission} 校验--
+     * 切片 38 起 {@code datasourcePermissions} 缺失即 fail-closed，故遗留包若无任何
+     * 授权声明会被拒绝，不会静默放行。
      */
     private String resolveScriptDatasource(PublishPackage pkg, String scriptId) {
         if (scriptId == null) {
@@ -187,8 +180,9 @@ public class QueryExecutionService {
     }
 
     /**
-     * 校验数据源在发布包 {@code datasourcePermissions} 授权范围内（切片 37）。
-     * 无授权声明时回退 default 放行（遗留包兼容）。
+     * 校验数据源在发布包 {@code datasourcePermissions} 授权范围内（切片 37，切片 38 收紧为 fail-closed）。
+     *
+     * <p>无授权声明（{@code datasourcePermissions} 缺失）时拒绝，不再静默放行。
      *
      * @return 违规说明；通过时返回 null
      */
@@ -196,7 +190,7 @@ public class QueryExecutionService {
         Object permsObj = pkg.metadata() != null
                 ? pkg.metadata().get("datasourcePermissions") : null;
         if (!(permsObj instanceof List<?> perms)) {
-            return null; // 遗留包无声明，放行
+            return "发布包缺少 datasourcePermissions 授权声明，拒绝执行（fail-closed）";
         }
         for (Object item : perms) {
             if (item instanceof Map<?, ?> perm
@@ -208,9 +202,9 @@ public class QueryExecutionService {
     }
 
     /**
-     * 校验 SQL 引用的表在指定数据源授权范围内（fail-closed）。
+     * 校验 SQL 引用的表在指定数据源授权范围内（fail-closed，切片 38 收紧）。
      *
-     * <p>metadata 无 {@code datasourcePermissions} 时按遗留包放行并告警；
+     * <p>metadata 无 {@code datasourcePermissions} 时拒绝（不再告警放行）；
      * 存在授权声明时严格校验。
      *
      * @param pkg        发布包
@@ -222,9 +216,7 @@ public class QueryExecutionService {
         Object permsObj = pkg.metadata() != null
                 ? pkg.metadata().get("datasourcePermissions") : null;
         if (!(permsObj instanceof List<?> perms)) {
-            log.warn("package_missing_datasource_permissions version={} legacy_mode=allow",
-                    pkg.manifest().packageVersion());
-            return null;
+            return "发布包缺少 datasourcePermissions 授权声明，拒绝执行（fail-closed）";
         }
 
         List<String> allowed = List.of();

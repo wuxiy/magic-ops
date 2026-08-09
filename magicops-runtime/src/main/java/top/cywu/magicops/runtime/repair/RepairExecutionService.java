@@ -227,10 +227,10 @@ public class RepairExecutionService {
     }
 
     /**
-     * 校验 SQL 引用的表在指定数据源授权范围内。
+     * 校验 SQL 引用的表在指定数据源授权范围内（fail-closed，切片 38 收紧）。
      *
-     * <p>metadata 无 {@code datasourcePermissions} 时按遗留包放行并告警；
-     * 存在授权声明时严格校验（fail-closed）。
+     * <p>metadata 无 {@code datasourcePermissions} 时拒绝（不再告警放行）；
+     * 存在授权声明时严格校验。
      *
      * @return 违规说明；通过时返回 null
      */
@@ -238,9 +238,7 @@ public class RepairExecutionService {
         Object permsObj = pkg.metadata() != null
                 ? pkg.metadata().get(METADATA_DATASOURCE_PERMISSIONS) : null;
         if (!(permsObj instanceof List<?> perms)) {
-            log.warn("package_missing_datasource_permissions version={} legacy_mode=allow",
-                    pkg.manifest().packageVersion());
-            return null;
+            return "发布包缺少 datasourcePermissions 授权声明，拒绝执行（fail-closed）";
         }
 
         List<String> allowed = allowedTables(perms, datasource);

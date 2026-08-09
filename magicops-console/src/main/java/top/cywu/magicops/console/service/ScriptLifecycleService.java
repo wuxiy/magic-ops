@@ -163,8 +163,13 @@ public class ScriptLifecycleService {
         ApprovalEntity approval = approvalRepository.findByScriptVersionId(script.getCurrentVersionId())
                 .orElseThrow(() -> new IllegalArgumentException("审批记录不存在"));
 
-        // 切片 31：提交人与审批人分离，禁止自审自批
-        if (approval.getSubmittedBy() != null && approval.getSubmittedBy().equals(reviewer)) {
+        // 切片 31/38：提交人与审批人分离，禁止自审自批（null-safe fail-closed）
+        String submittedBy = approval.getSubmittedBy();
+        if (submittedBy == null) {
+            throw new ApprovalSeparationException(
+                    "审批记录缺少提交人，无法校验提交人/审批人分离，拒绝审批（fail-closed）");
+        }
+        if (submittedBy.equals(reviewer)) {
             throw new ApprovalSeparationException(
                     "审批人 " + reviewer + " 同时是该版本的提交人，不允许审批本人提交的版本");
         }

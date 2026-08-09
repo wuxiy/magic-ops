@@ -32,11 +32,12 @@ class RepairExecutionServiceTest {
     private AuditService auditService;
     private DynamicDataSourceManager dataSourceManager;
     private SigningService signingService;
+    private SqlGuardService sqlGuardService;
     private KeyPair keyPair;
 
     @BeforeEach
     void setUp() throws Exception {
-        SqlGuardService sqlGuardService = new SqlGuardService();
+        sqlGuardService = new SqlGuardService();
         auditService = new AuditService();
         dataSourceManager = new DynamicDataSourceManager();
         dryRunService = new DryRunService(sqlGuardService);
@@ -352,10 +353,26 @@ class RepairExecutionServiceTest {
     }
 
     /**
-     * 构建带默认审批凭据的发布包（无额外 metadata）。
+     * 构建带默认审批凭据的发布包（声明 default 数据源 + 自动提取表授权，切片 38 fail-closed 兼容）。
      */
     private PublishPackage buildPackage(String sql) {
-        return buildPackage(sql, Map.of());
+        return buildPackage(sql, defaultDatasourceMetadata(sql));
+    }
+
+    /**
+     * 从 SQL 提取引用表，构造 default 数据源的 datasourcePermissions（镜像 PackageBuildService）。
+     */
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> defaultDatasourceMetadata(String sql) {
+        try {
+            var stmt = sqlGuardService.parseSingleStatement(sql);
+            List<String> tables = sqlGuardService.tablesIn(stmt);
+            return Map.of("datasourcePermissions", List.of(
+                    Map.of("datasource", "default", "tables", tables)));
+        } catch (Exception e) {
+            return Map.of("datasourcePermissions", List.of(
+                    Map.of("datasource", "default", "tables", List.of())));
+        }
     }
 
     /**

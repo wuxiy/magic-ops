@@ -90,7 +90,11 @@ class QueryExecutionContractTest {
         byte[] normalized = CanonicalJson.normalizeScript(sql);
         String contentHash = signingService.sha256Hex(normalized);
 
-        Map<String, Object> metadata = Map.of("routeMapping", List.of());
+        Map<String, Object> metadata = Map.of(
+                "routeMapping", List.of(),
+                "datasourcePermissions", List.of(
+                        Map.of("datasource", "default", "tables", List.of())),
+                "scriptDatasource", Map.of(scriptId, "default"));
         String metadataHash = signingService.hashMetadata(metadata);
         Map<String, Object> policy = Map.of();
 

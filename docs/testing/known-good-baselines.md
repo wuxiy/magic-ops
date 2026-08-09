@@ -18,6 +18,17 @@
 
 ## 最近完整验证
 
+2026-08-09：切片 38 治理弱点收紧（fail-closed 加固）
+
+- `mvn test`：304 例通过（0 失败，12 模块全绿）；Docker E2E on PostgreSQL 16/16 通过。
+- 收紧第二次复核发现的 5 项 fail-OPEN 治理弱点：
+  1. datasourcePermissions 缺失 fail-OPEN -> fail-closed（Query+Repair，Javadoc 与代码对齐）。
+  2. 未声明数据源回退 default 仍经 fail-closed 权限校验（不再静默放行）。
+  3. 提交人/审批人 null 守卫 fail-OPEN -> null-safe fail-closed（ScriptLifecycleService）。
+  4. 移除 executeQuery 4 参重载（绕过切片 37 路由的死 API）；3 参遗留路径文档化为 internal。
+  5. 共享密钥 String.equals -> MessageDigest.isEqual 常量时间比较。
+- 测试同步：legacy-allow 测试翻转为 fail-closed 拒绝；测试包 helper 镜像 PackageBuildService 始终声明 datasourcePermissions + scriptDatasource。
+
 2026-08-09：第二次整体生产准入复核（切片 30-37 关闭后）
 
 - `mvn test`：304 例通过（0 失败，12 模块全绿）；Docker Compose E2E on PostgreSQL 16/16 通过。基线已复核确认。

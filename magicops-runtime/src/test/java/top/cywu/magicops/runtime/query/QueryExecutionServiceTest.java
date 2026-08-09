@@ -179,15 +179,32 @@ class QueryExecutionServiceTest {
     }
 
     @Test
-    void executeQuery_legacyPackageNoPermissions_allowed() {
-        // 无 datasourcePermissions 的遗留包按告警放行
-        PublishPackage pkg = buildPackage("SELECT * FROM patients");
-        String traceId = UUID.randomUUID().toString();
+    void executeQuery_legacyPackageNoPermissions_rejected() {
+        // 切片 38：无 datasourcePermissions 的包应被 fail-closed 拒绝（不再告警放行）
+        PublishPackage pkg = buildPackageWithPermissions("SELECT 1", List.of());
+        // 构造一个无 datasourcePermissions 的包
+        Map<String, Object> metadata = Map.of("routeMapping", List.of());
+        String metadataHash = signingService.hashMetadata(metadata);
+        PackageManifest manifest = new PackageManifest(
+                "test", "development", "1.0.0", "0.1.0", "tester", Instant.now(), "test-key",
+                List.of(new PackageManifest.ScriptEntry(
+                        "script-001", "/api/test", "GET", "1.0.0",
+                        "DYNAMIC_QUERY", "LOW",
+                        signingService.sha256Hex(CanonicalJson.normalizeScript("SELECT 1")), "")),
+                metadataHash,
+                signingService.sha256Hex(CanonicalJson.toCanonicalBytes(Map.of())),
+                "SHA256withRSA", null);
+        byte[] scripts = CanonicalJson.normalizeScript("SELECT 1");
+        byte[] signingInput = signingService.buildSigningInput(manifest, metadata,
+                Map.of("/api/test", scripts));
+        PublishPackage legacyPkg = new PublishPackage(manifest, Map.of("/api/test", scripts),
+                metadata, Map.of(), signingService.sign(signingInput, keyPair.getPrivate()));
 
-        QueryExecutionResult result = queryService.executeQuery(pkg,
-                "SELECT * FROM patients", traceId);
+        QueryExecutionResult result = queryService.executeQuery(legacyPkg,
+                "SELECT 1", UUID.randomUUID().toString());
 
-        assertTrue(result.success(), "遗留包（无授权声明）应放行: " + result.errorMessage());
+        assertFalse(result.success(), "无 datasourcePermissions 的包应被 fail-closed 拒绝");
+        assertTrue(result.errorMessage().contains("datasourcePermissions"));
     }
 
     @Test
@@ -235,29 +252,15 @@ class QueryExecutionServiceTest {
     }
 
     private PublishPackage buildPackage(String sql) {
-        byte[] normalizedScript = CanonicalJson.normalizeScript(sql);
-        String contentHash = signingService.sha256Hex(normalizedScript);
-
-        Map<String, Object> metadata = Map.of("routeMapping", List.of());
-        String metadataHash = signingService.hashMetadata(metadata);
-        Map<String, Object> policy = Map.of();
-
-        PackageManifest manifest = new PackageManifest(
-                "test-project", "development", "1.0.0", "0.1.0",
-                "tester", Instant.now(), "test-key",
-                List.of(new PackageManifest.ScriptEntry(
-                        "script-001", "/api/test", "GET", "1.0.0",
-                        "DYNAMIC_QUERY", "LOW", contentHash, ""
-                )),
-                metadataHash,
-                signingService.sha256Hex(CanonicalJson.toCanonicalBytes(policy)),
-                "SHA256withRSA", null
-        );
-
-        Map<String, byte[]> scripts = Map.of("/api/test", normalizedScript);
-        byte[] signingInput = signingService.buildSigningInput(manifest, metadata, scripts);
-        byte[] signature = signingService.sign(signingInput, keyPair.getPrivate());
-
-        return new PublishPackage(manifest, scripts, metadata, policy, signature);
+        // 切片 38：测试包镜像 PackageBuildService，始终声明 datasourcePermissions +
+        // scriptDatasource（fail-closed 后无声明的包会被拒绝）
+        try {
+            var stmt = new top.cywu.magicops.sqlguard.SqlGuardService()
+                    .parseSingleStatement(sql);
+            List<String> tables = new top.cywu.magicops.sqlguard.SqlGuardService().tablesIn(stmt);
+            return buildPackageWithPermissions(sql, tables);
+        } catch (Exception e) {
+            return buildPackageWithPermissions(sql, List.of());
+        }
     }
 }

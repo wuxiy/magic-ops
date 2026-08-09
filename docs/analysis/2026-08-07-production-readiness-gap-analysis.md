@@ -52,15 +52,15 @@
 1. **达梦方言抽样验证**（接入目标业务库前置）：JSQLParser、`active_packages` TEXT、`data_sources` 同步、`script_versions.datasource` 在达梦下未验证。当前全部基于 H2/PostgreSQL。
 2. **Console 缺下线发送端**：`PushService` 只有 `push()`，无 `deactivate` 调用方（`PACKAGE_DEACTIVATE_PATH` 在 console 模块无引用）。Runtime 下线端点已就位且 fail-closed，但无自动化 Console 客户端触发下线。
 
-### 应收紧的治理弱点（建议上线前修复，非硬阻断但削弱纵深）
+### 应收紧的治理弱点（切片 38 已全部修复，2026-08-09）
 
-> 复核发现以下 fail-OPEN 遗留兼容路径，与 Javadoc "fail-closed" 声明不一致：
+> 第二次复核发现的 fail-OPEN 遗留兼容路径，切片 38 已全部收紧为 fail-closed 或常量时间比较：
 
-- **`datasourcePermissions` 元数据缺失时 fail-OPEN**：`QueryExecutionService:198-200`/`:224-228`、`RepairExecutionService:240-244` 在包无 `datasourcePermissions` 时仅 `log.warn` 放行（非 fail-closed）。当前 `PackageBuildService` 总会写入该字段（含 `default` 兜底），故正常签名包不可达；但伪造/遗留包可绕过表白名单层（仍受审批凭据层保护）。建议收紧为 fail-closed 或明确仅 dev 兼容。
-- **未声明数据源回退 `default` 而非拒绝**：`resolveScriptDatasource`（Query:186/Repair:226）在无 `scriptDatasource` 元数据时回退 default，与"未声明即拒绝"的严格语义有差距。属遗留兼容，正常包总有声明。
-- **提交人/审批人分离的 null 守卫 fail-OPEN**：`ScriptLifecycleService:167` 当 `submittedBy` 为 null 时跳过校验（正常流程总会设值）。建议改 null-safe fail-closed。
-- **公共 `executeQuery` 3/4 参重载绕过切片 37 路由**：`QueryExecutionService:57,70` 跳过脚本数据源路由与权限校验（当前生产仅 Controller 用 5 参重载，未调用，属潜在风险 API）。
-- **共享密钥明文比较 + 精确 URI 匹配**：`PushSecretAuthenticationFilter:49` 用 `String.equals`（时序攻击面），`:74-75` 精确 URI 匹配（未来 `/api/packages/**` 新 POST 端点需手动加入白名单）。
+- ✅(切片38已修复) **`datasourcePermissions` 元数据缺失时 fail-OPEN**：`QueryExecutionService:198-200`/`:224-228`、`RepairExecutionService:240-244` 在包无 `datasourcePermissions` 时仅 `log.warn` 放行（非 fail-closed）。当前 `PackageBuildService` 总会写入该字段（含 `default` 兜底），故正常签名包不可达；但伪造/遗留包可绕过表白名单层（仍受审批凭据层保护）。建议收紧为 fail-closed 或明确仅 dev 兼容。
+- ✅(切片38已修复) **未声明数据源回退 `default` 而非拒绝**：`resolveScriptDatasource`（Query:186/Repair:226）在无 `scriptDatasource` 元数据时回退 default，与"未声明即拒绝"的严格语义有差距。属遗留兼容，正常包总有声明。
+- ✅(切片38已修复) **提交人/审批人分离的 null 守卫 fail-OPEN**：`ScriptLifecycleService:167` 当 `submittedBy` 为 null 时跳过校验（正常流程总会设值）。建议改 null-safe fail-closed。
+- ✅(切片38已修复) **公共 `executeQuery` 3/4 参重载绕过切片 37 路由**：`QueryExecutionService:57,70` 跳过脚本数据源路由与权限校验（当前生产仅 Controller 用 5 参重载，未调用，属潜在风险 API）。
+- ✅(切片38已修复) **共享密钥明文比较 + 精确 URI 匹配**：`PushSecretAuthenticationFilter:49` 用 `String.equals`（时序攻击面），`:74-75` 精确 URI 匹配（未来 `/api/packages/**` 新 POST 端点需手动加入白名单）。
 
 ### 运营支撑仍开放（非阻断，按灰度阶段补齐）
 
