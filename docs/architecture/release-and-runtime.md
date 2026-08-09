@@ -126,6 +126,15 @@ Runtime 必须拒绝：
 - 缺少资源权限元数据的发布包；
 - 未授权 Console 身份推送的发布包。
 
+## 执行语义（切片 34）
+
+Runtime 执行端点（`/api/query`、`/api/repair/*`、`/api/adapter/execute`）采用**脚本引用模式**：
+
+- 请求只携带 `scriptId`（查询/修复）或 `scriptId` + `body`（适配），不携带裸 SQL/裸目标。
+- `ScriptResolver` 按 `scriptId` 从激活包 manifest 查 `ScriptEntry`、从 `pkg.scripts()` 取脚本内容、校验 contentHash，返回解析后的内容。
+- 执行内容来自已签名发布包：查询/修复执行包内脚本内容（SQL），适配执行包内脚本定义的 `{targetId,path,method}` + 请求 body。
+- 缺 `scriptId` 的裸 SQL/裸目标请求一律 400 拒绝。magic-editor 保留调试能力，但生产执行必须走发布链路（双轨决策方向 A）。
+
 ## 回滚与下线
 
 下线（切片 33-d）：Console 向 `POST /api/packages/deactivate` 推送下线指令（受共享密钥认证保护）。Runtime 将 ACTIVE 行置 INACTIVE、清空激活缓存、落 `PACKAGE_DEACTIVATED` 关键审计。下线后 `getActivePackage()` 返回 null，查询/修复/适配端点据此拒绝执行（"没有已激活的发布包"）。下线后重新上线走发布链路：重新推送已签名发布包经 `verifyAndActivate` 验签激活。

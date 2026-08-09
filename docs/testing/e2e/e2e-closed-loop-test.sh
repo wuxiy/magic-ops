@@ -83,7 +83,7 @@ if [ "$SCRIPT_STATUS" = "DRAFT" ]; then pass "Script created: id=$SCRIPT_ID, sta
 step "Step 2: 更新草稿 (调试)"
 HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -u $AUTH -X PUT "$CONSOLE_URL/api/scripts/$SCRIPT_ID/draft" \
   -H "Content-Type: application/json" \
-  -d '{"content":"SELECT id, name, age FROM patients WHERE id = #{id}","routePath":"/api/patients/query","routeMethod":"GET"}')
+  -d '{"content":"SELECT 1 AS test_value","routePath":"/api/patients/query","routeMethod":"GET"}')
 if [ "$HTTP_CODE" = "200" ]; then pass "Draft updated"; else fail "Draft update failed: HTTP $HTTP_CODE"; fi
 
 step "Step 3: 创建版本"
@@ -132,21 +132,21 @@ ACTIVE_STATUS=$(echo "$ACTIVE_RESP" | python3 -c "import sys,json; print(json.lo
 ACTIVE_VERSION=$(echo "$ACTIVE_RESP" | python3 -c "import sys,json; print(json.load(sys.stdin)['version'])")
 if [ "$ACTIVE_STATUS" = "active" ]; then pass "Runtime loaded package: v$ACTIVE_VERSION"; else fail "Package not active: $ACTIVE_STATUS"; fi
 
-step "Step 9: Runtime 执行查询"
+step "Step 9: Runtime 脚本引用执行查询 (切片 34)"
 QUERY_RESP=$(curl -s -u runtime:runtime -X POST "$RUNTIME_URL/api/query" \
   -H "Content-Type: application/json" \
-  -d '{"sql":"SELECT 1 AS test_value","traceId":"e2e-trace-001"}')
+  -d "{\"scriptId\":\"$SCRIPT_ID\",\"traceId\":\"e2e-trace-001\"}")
 QUERY_SUCCESS=$(echo "$QUERY_RESP" | python3 -c "import sys,json; print(json.load(sys.stdin)['success'])")
 QUERY_ROWS=$(echo "$QUERY_RESP" | python3 -c "import sys,json; print(json.load(sys.stdin)['resultSize'])")
 QUERY_TRACE=$(echo "$QUERY_RESP" | python3 -c "import sys,json; print(json.load(sys.stdin)['traceId'])")
-if [ "$QUERY_SUCCESS" = "True" ]; then pass "Query executed: rows=$QUERY_ROWS, traceId=$QUERY_TRACE"; else fail "Query failed: $(echo $QUERY_RESP | python3 -c "import sys,json; print(json.load(sys.stdin).get('errorMessage','unknown'))")"; fi
+if [ "$QUERY_SUCCESS" = "True" ]; then pass "Query executed via script reference: rows=$QUERY_ROWS, traceId=$QUERY_TRACE"; else fail "Query failed: $(echo $QUERY_RESP | python3 -c "import sys,json; print(json.load(sys.stdin).get('errorMessage','unknown'))")"; fi
 
-step "Step 10: SQL Guard 拒绝非 SELECT"
+step "Step 10: 裸 SQL 请求被拒绝 (切片 34)"
 REJECT_RESP=$(curl -s -u runtime:runtime -X POST "$RUNTIME_URL/api/query" \
   -H "Content-Type: application/json" \
   -d '{"sql":"DELETE FROM patients WHERE id = 1","traceId":"e2e-trace-002"}')
-REJECT_SUCCESS=$(echo "$REJECT_RESP" | python3 -c "import sys,json; print(json.load(sys.stdin)['success'])")
-if [ "$REJECT_SUCCESS" = "False" ]; then pass "SQL Guard rejected DELETE"; else fail "DELETE should have been rejected"; fi
+REJECT_HTTP=$(echo "$REJECT_RESP" | python3 -c "import sys,json; print(json.load(sys.stdin).get('error',''))")
+if echo "$REJECT_HTTP" | grep -q "scriptId"; then pass "Bare SQL request rejected (scriptId required)"; else fail "Bare SQL should be rejected, got: $REJECT_HTTP"; fi
 
 # 总结
 echo ""

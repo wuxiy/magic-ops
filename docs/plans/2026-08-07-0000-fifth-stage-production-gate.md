@@ -2,7 +2,7 @@
 
 ## 状态
 
-进行中。切片 30（2026-08-07）、切片 31（2026-08-08）、切片 32（2026-08-08）、切片 33（2026-08-09）已获人工确认并实现，见各切片关闭记录。依据 `docs/analysis/2026-08-07-production-readiness-gap-analysis.md` 的 P0 清单整理。
+进行中。切片 30（2026-08-07）、切片 31（2026-08-08）、切片 32（2026-08-08）、切片 33（2026-08-09）、切片 34（2026-08-09）已获人工确认并实现，见各切片关闭记录。依据 `docs/analysis/2026-08-07-production-readiness-gap-analysis.md` 的 P0 清单整理。
 
 ## 目标
 
@@ -154,7 +154,7 @@
 - 实现原则：复用 JDK/Spring/Jackson 标准机制与既有 `toMap`/`SigningService`/`AuditService`，未新增第三方依赖；Console 经 Flyway 拥有生产 schema，Runtime 以 `ddl-auto=validate` 校验，不自建迁移，避免 schema 双写漂移。
 - 遗留事项：Docker Compose E2E on PostgreSQL（含重启重载、审计持久化、HTTP 目标同步验证）随切片 34 收口阶段执行；达梦方言下 `http_targets` 同步与 `active_packages` TEXT 列兼容性需抽样验证。
 
-### 切片 34：执行语义对齐（依赖切片 33，需人工确认）
+### 切片 34：执行语义对齐（已关闭，2026-08-09，人工确认）
 
 目标：
 
@@ -173,6 +173,22 @@
 - E2E：创建→审批→发布→脚本引用执行全链路成功，裸 SQL 请求被拒绝；
 - 既有调用方影响清单已盘点并记录（本计划内 Console/插件为唯一已知调用方）；
 - 架构 owner docs 反映新契约。
+
+
+关闭记录：
+
+- 新增 `ScriptResolver`（`@Component`，依赖 `SigningService`）：按 `scriptId` 从激活包 manifest 查 `ScriptEntry`、从 `pkg.scripts()` 取内容、校验 contentHash（防御纵深，签名验签时已校验），返回 `ResolvedScript`；未引用脚本/找不到/hash 不匹配抛 `PackageRejectedException`。
+- `QueryController`：请求 `{scriptId, traceId}`，resolve 后取 `contentAsString()` 作为 SQL 执行；缺 scriptId 返回 400（"切片 34 起拒绝裸 SQL 调用"）。
+- `RepairController`：dry-run 与 execute 均按 `scriptId` 从包解析 SQL 后走既有 dry-run + 审批校验 + 表白名单 + 事务化执行；服务层签名不变，`contentHash` 绑定成为内容自洽的防御纵深。
+- `HttpAdapterController`：请求 `{scriptId, body, traceId}`，适配脚本内容为 JSON `{targetId,path,method}`（随包签名），请求只提供 body；缺 scriptId 返回 400（"切片 34 起拒绝裸目标调用"）。
+- 服务层签名不变：`QueryExecutionService`/`RepairExecutionService`/`HttpAdapterService` 仍按原参数接收已解析内容，既有 34 例服务单元测试零改动通过；契约强制在 Controller 边界。
+- E2E 更新：Step 2 脚本内容改为可执行的 `SELECT 1 AS test_value`（包脚本成为执行源）；Step 9 改为脚本引用执行 `{"scriptId":"$SCRIPT_ID"}`，rows=1 通过；Step 10 改为裸 SQL `{"sql":"DELETE..."}` 被拒（缺 scriptId）。
+- 既有调用方影响清单：本计划内 Console（`PushService` 推送）与 Runtime 插件为唯一已知调用方；查询/修复/适配的生产调用方经此契约变更后须改用 scriptId 引用。无第三方外部调用方记录。
+- 验证：全量 `mvn test` 292 例通过（0 失败，12 模块全绿），较切片 33 基线 285 新增 7 例（`ScriptResolverTest` 4：解析成功/未知 scriptId/空 scriptId/hash 不匹配；`QueryExecutionContractTest` 3：scriptId 执行成功/裸 SQL 拒绝/未知 scriptId 拒绝）。E2E 闭环 12 步全部通过。
+- 实现原则：复用既有 `SigningService.sha256Hex`/`PublishPackage`/`PackageRejectedException`，未新增第三方依赖。
+- 遗留事项：magic-editor 与生产执行路径边界的入口提示/文档（UI 侧）后续 P1 跟进；Docker Compose E2E on PostgreSQL 仍待执行（切片 33 遗留）。
+
+
 
 ## 验证策略
 

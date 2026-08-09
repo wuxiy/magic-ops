@@ -12,11 +12,21 @@
 
 **第三阶段（切片 17）**：文档全量同步、Arthas 诊断中心需求与架构设计、magicops-diagnosis 模块骨架。
 
-**第五阶段（切片 30-33）**：SQL Guard 解析器化与数据修复事务化强制、身份与追责（actor 绑定登录用户、提交人/审批人分离、prod 禁测试账号）、密钥与凭据固化（prod fail-fast、KeyStore 装配、收包共享密钥认证）、Runtime 闭环（激活包持久化与启动重载、Runtime 审计持久化、HttpTarget 从 DB 同步、发布下线端点）。
+**第五阶段（切片 30-34）**：SQL Guard 解析器化与数据修复事务化强制、身份与追责、密钥与凭据固化、Runtime 闭环（激活包持久化与启动重载、Runtime 审计持久化、HttpTarget 从 DB 同步、发布下线端点）、执行语义对齐（脚本引用模式，拒绝裸 SQL/裸目标调用）。
 
-**测试**：285 个单元测试全部通过（2026-08-09 切片 33 关闭复核）。
+**测试**：292 个单元测试全部通过（2026-08-09 切片 34 关闭复核）。
 
 ## 最近完整验证
+
+2026-08-09：第五阶段切片 34（执行语义对齐）
+
+- `mvn test`：通过（292 个测试，0 失败，12 模块全绿），较切片 33 基线 285 新增 7 例。
+  - `ScriptResolverTest` 4 例（scriptId 解析成功、未知 scriptId 拒绝、空 scriptId 拒绝、contentHash 不匹配拒绝）。
+  - `QueryExecutionContractTest` 3 例（脚本引用执行成功、裸 SQL 拒绝、未知 scriptId 拒绝）。
+  - 既有 34 例服务单元测试（Query/Repair/Adapter Service）零改动通过。
+- E2E 闭环 12 步全部通过：Step 9 脚本引用执行查询 rows=1，Step 10 裸 SQL 请求被拒（缺 scriptId）。
+- 代码级实现：`ScriptResolver` 按 scriptId 从激活包解析内容并校验 contentHash；`QueryController`/`RepairController`/`HttpAdapterController` 改为脚本引用模式，缺 scriptId 返回 400。
+- 既有调用方影响：本计划内 Console（PushService）与 Runtime 插件为唯一已知调用方，须改用 scriptId 引用。
 
 2026-08-09：第五阶段切片 33（Runtime 闭环与可靠性）
 

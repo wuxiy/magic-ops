@@ -14,7 +14,7 @@
 
 本节为 2026-08-09 针对 main 分支的**代码级独立复核**结论（非仅依据文档/计划状态）。下方 A1-A6 仍为 2026-08-07 基线快照，部分条目已被切片 30-32 关闭，状态以本节为准。
 
-**结论不变**：不建议现在整体接入生产做日常运维。硬阻断为切片 33/34 未实现（见下"仍开放"）。
+**结论更新：P0-1 至 P0-5 全部关闭（切片 30-34）。代码级治理强制闭环已完成；剩余上线阻断为运营支撑能力（可观测、CI、真实数据库验证、业务数据源管理 API），见下方"仍开放"与 A5/A6。
 
 已关闭并代码验证（P0-1/P0-2/P0-3）：
 
@@ -25,7 +25,7 @@
 仍开放（硬阻断，上线前必须解决）：
 
 - P0-4 Runtime 闭环（A4）= 切片 33 **已关闭（2026-08-09）**：激活包落 `active_packages` 表并 `@PostConstruct` 重载验签（替换 AtomicReference 内存态）；Runtime 审计持久化（`RuntimeApplication` 装配 `@EnableJpaRepositories`/`@EntityScan`，消除内存 fallback）；`HttpTargetSyncService` 启动+定时从 `http_targets` 同步；`POST /api/packages/deactivate` 下线端点受共享密钥保护。Docker Compose E2E on PostgreSQL 待切片 34 收口执行。
-- P0-5 双轨/执行语义（A2）= 切片 34 未实现：repair 已有 contentHash 绑定，但 `query` 与 `adapter/execute` 仍执行请求体里的 SQL/target/path（`HttpAdapterController:28` 直接取请求体字段执行），签名包仅被检查"是否存在激活包"，未对齐"生产执行必须走签名发布链路"的安全模型。
+- P0-5 双轨/执行语义（A2）= 切片 34 **已关闭（2026-08-09）**：query/repair/adapter 执行端点改为脚本引用模式（`ScriptResolver` 按 scriptId 从激活包解析内容并校验 contentHash），拒绝裸 SQL/裸目标调用（缺 scriptId 返回 400）。E2E 脚本引用执行通过、裸 SQL 被拒。
 
 修正（A6）：前端构建产物现已正确 gitignore（`.gitignore` 覆盖 `magicops-console/src/main/resources/static/console/`，git 跟踪数为 0），原"前端构建产物直接提交 git"不再成立；但"前端未纳入 Maven 构建（无 frontend-maven-plugin）"仍成立。其余 A5（可观测）、A6（无 CI、集成测试全 H2、无达梦验证、Docker Compose 未真实跑）仍开放。
 
