@@ -1,17 +1,14 @@
 package top.cywu.magicops.runtime.packageMgmt;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import top.cywu.magicops.sign.canonical.CanonicalJson;
-import top.cywu.magicops.sign.model.PackageManifest;
 import top.cywu.magicops.sign.model.PublishPackage;
 
 import java.time.Instant;
-import java.util.*;
+import java.util.Map;
 
 /**
  * Runtime 发布包接收 API。
@@ -23,7 +20,6 @@ import java.util.*;
 public class PackageReceiveController {
 
     private static final Logger log = LoggerFactory.getLogger(PackageReceiveController.class);
-    private static final ObjectMapper MAPPER = new ObjectMapper();
 
     private final PackageVerificationService verificationService;
 
@@ -32,10 +28,9 @@ public class PackageReceiveController {
     }
 
     @PostMapping
-    @SuppressWarnings("unchecked")
     public ResponseEntity<Map<String, Object>> receive(@RequestBody Map<String, Object> body) {
         try {
-            PublishPackage pkg = deserializePackage(body);
+            PublishPackage pkg = PublishPackage.fromMap(body);
             verificationService.verifyAndActivate(pkg);
 
             return ResponseEntity.ok(Map.of(
@@ -67,52 +62,20 @@ public class PackageReceiveController {
         ));
     }
 
-    @SuppressWarnings("unchecked")
-    private PublishPackage deserializePackage(Map<String, Object> body) {
-        Map<String, Object> manifestMap = (Map<String, Object>) body.get("manifest");
-        Map<String, Object> metadataMap = (Map<String, Object>) body.getOrDefault("metadata", Map.of());
-        Map<String, Object> policyMap = (Map<String, Object>) body.getOrDefault("policy", Map.of());
-
-        // 解析 scripts
-        Map<String, String> scriptsB64 = (Map<String, String>) body.getOrDefault("scripts", Map.of());
-        Map<String, byte[]> scripts = new LinkedHashMap<>();
-        for (var entry : scriptsB64.entrySet()) {
-            scripts.put(entry.getKey(), Base64.getDecoder().decode(entry.getValue()));
-        }
-
-        // 解析 signature
-        byte[] signature = Base64.getDecoder().decode((String) body.get("signature"));
-
-        // 解析 manifest scripts
-        List<Map<String, Object>> scriptMaps = (List<Map<String, Object>>) manifestMap.getOrDefault("scripts", List.of());
-        List<PackageManifest.ScriptEntry> entries = scriptMaps.stream()
-                .map(m -> new PackageManifest.ScriptEntry(
-                        (String) m.get("scriptId"),
-                        (String) m.get("path"),
-                        (String) m.get("method"),
-                        (String) m.get("version"),
-                        (String) m.get("scenario"),
-                        (String) m.get("riskLevel"),
-                        (String) m.get("contentHash"),
-                        (String) m.get("metadataHash")
-                ))
-                .toList();
-
-        PackageManifest manifest = new PackageManifest(
-                (String) manifestMap.get("projectCode"),
-                (String) manifestMap.get("environment"),
-                (String) manifestMap.get("packageVersion"),
-                (String) manifestMap.get("runtimeVersion"),
-                (String) manifestMap.get("publishedBy"),
-                Instant.parse((String) manifestMap.get("publishedAt")),
-                (String) manifestMap.get("keyId"),
-                entries,
-                (String) manifestMap.get("metadataHash"),
-                (String) manifestMap.get("policyHash"),
-                (String) manifestMap.get("signAlg"),
-                (String) manifestMap.get("signature")
-        );
-
-        return new PublishPackage(manifest, scripts, metadataMap, policyMap, signature);
+    /**
+     * 下线当前激活的发布包（切片 33-d）。
+     *
+     * <p>由 Console 推送，受共享密钥认证保护。下线后 Runtime 拒绝脚本执行。
+     */
+    @PostMapping("/deactivate")
+    public ResponseEntity<Map<String, Object>> deactivate(@RequestBody Map<String, Object> body) {
+        String operator = body.getOrDefault("operator", "unknown").toString();
+        String reason = body.getOrDefault("reason", "未提供").toString();
+        String version = verificationService.deactivate(operator, reason);
+        return ResponseEntity.ok(Map.of(
+                "status", "deactivated",
+                "version", version != null ? version : "none",
+                "timestamp", Instant.now().toString()
+        ));
     }
 }

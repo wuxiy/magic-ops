@@ -12,11 +12,23 @@
 
 **第三阶段（切片 17）**：文档全量同步、Arthas 诊断中心需求与架构设计、magicops-diagnosis 模块骨架。
 
-**第五阶段（切片 30-32）**：SQL Guard 解析器化与数据修复事务化强制、身份与追责（actor 绑定登录用户、提交人/审批人分离、prod 禁测试账号）、密钥与凭据固化（prod fail-fast、KeyStore 装配、收包共享密钥认证）。
+**第五阶段（切片 30-33）**：SQL Guard 解析器化与数据修复事务化强制、身份与追责（actor 绑定登录用户、提交人/审批人分离、prod 禁测试账号）、密钥与凭据固化（prod fail-fast、KeyStore 装配、收包共享密钥认证）、Runtime 闭环（激活包持久化与启动重载、Runtime 审计持久化、HttpTarget 从 DB 同步、发布下线端点）。
 
-**测试**：277 个单元测试全部通过（2026-08-09 复核重跑确认）。
+**测试**：285 个单元测试全部通过（2026-08-09 切片 33 关闭复核）。
 
 ## 最近完整验证
+
+2026-08-09：第五阶段切片 33（Runtime 闭环与可靠性）
+
+- `mvn test`：通过（285 个测试，0 失败，12 模块全绿），较切片 32 基线 277 新增 8 例。
+  - `RuntimeAuditPersistenceTest` 2 例（AuditRecordRepository 装配非 null、关键审计落库可查回）。
+  - `ActivePackagePersistenceTest` 2 例（激活包落库 + 重启重载验签、篡改 payload 重载验签失败置 INACTIVE 不激活）。
+  - `HttpTargetSyncTest` 2 例（DB enabled 目标同步到注册表、disabled 目标不同步）。
+  - `PackageDeactivateTest` 2 例（下线后 getActivePackage 返回 null + 关键审计、未认证 401）。
+  - 既有 `PackageVerificationServiceTest`（5）、`PackageReceiveAuthIntegrationTest`（4）、`HttpTargetRegistryTest`（8）无回归。
+- 代码级实现：Runtime 装配 `@EntityScan`/`@EnableJpaRepositories`/`@EnableScheduling`；`active_packages` 表（V10）+ `PackageVerificationService` 落库与 `@PostConstruct` 重载验签；`HttpTargetSyncService` 启动+定时从 `http_targets` 同步；`deactivate()` 下线端点受共享密钥保护。
+- 共享 PostgreSQL 拓扑：Console 经 Flyway 建表，Runtime `ddl-auto=validate` 校验，不自建迁移，避免 schema 双写漂移。
+- 仍待 Docker E2E on PostgreSQL 验证（含重启重载、审计持久化、HTTP 目标同步），随切片 34 收口执行。
 
 2026-08-09：生产准入复核（独立代码级重审，非仅依据文档）
 

@@ -15,6 +15,12 @@ spring:
       minimum-idle: 2
       idle-timeout: 300000
       connection-timeout: 30000
+  # 切片 33：Runtime 共享 Console 的 PostgreSQL schema。Console 经 Flyway 建表，Runtime 只校验，不自建迁移
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
   # 生产 Basic 认证凭据外置（切片 32）：密码必须显式提供，禁止使用默认值
   security:
     user:

@@ -2,7 +2,7 @@
 
 ## 状态
 
-进行中。切片 30（2026-08-07）、切片 31（2026-08-08）、切片 32（2026-08-08）已获人工确认并实现，见各切片关闭记录。依据 `docs/analysis/2026-08-07-production-readiness-gap-analysis.md` 的 P0 清单整理。
+进行中。切片 30（2026-08-07）、切片 31（2026-08-08）、切片 32（2026-08-08）、切片 33（2026-08-09）已获人工确认并实现，见各切片关闭记录。依据 `docs/analysis/2026-08-07-production-readiness-gap-analysis.md` 的 P0 清单整理。
 
 ## 目标
 
@@ -126,7 +126,7 @@
 - 验证：全量 `mvn test` 277 例通过（0 失败），较切片 31 新增 24 例：`KeyProviderTest` 10 例（fail-fast、环境变量密钥、JDK keytool 生成的 JKS 多 keyId 装配/覆盖/回退/错误密码）、`PushSecretAuthenticationFilterTest` 7 例、`PackageReceiveAuthIntegrationTest` 4 例（真实过滤器链 401/放行）、`PushServiceTest` 3 例（JDK HttpServer 捕获请求头）；`KeyRotationServiceTest` 7 例不受影响仍通过。prod fail-fast 以真实 jar 启动验证（EXIT=1，日志出现"签名密钥缺失"指引）。E2E 更新为携带共享密钥推送并新增未认证推送 401 负例（Step 5c），12 步全部通过。`docker compose config` 语法校验通过，且缺失必填密钥时报错带中文指引。
 - 遗留事项：达梦/prod 拓扑下 KeyStore 文件挂载路径的部署演练随切片 33/34 Docker E2E 覆盖。
 
-### 切片 33：Runtime 闭环与可靠性
+### 切片 33：Runtime 闭环与可靠性（已关闭，2026-08-09）
 
 目标：
 
@@ -135,14 +135,6 @@
 - Runtime 审计持久化：`RuntimeApplication` 装配 `@EnableJpaRepositories`/`@EntityScan`，消除内存 fallback，并移除切片 30 对 `AuditController` 的扫描排除；
 - 新增发布回滚/下线端点：Console 侧下线与回滚操作构建对应状态包推送 Runtime，Runtime 验证后停用。
 
-产物：
-
-- Runtime Flyway 迁移（active_packages 表）与 prod 配置补全；
-- 激活包持久化与启动重载逻辑；
-- HTTP 目标同步服务；
-- 回滚/下线端点与 Runtime 停用逻辑；
-- 对应测试。
-
 关闭标准：
 
 - Runtime 重启后自动重载激活包并通过验签与环境校验（测试覆盖）；
@@ -150,6 +142,17 @@
 - Runtime 重启后关键执行审计仍可从数据库查询（Docker E2E 验证）；
 - 下线后 Runtime 拒绝对应脚本执行（测试覆盖）；
 - Docker Compose E2E 回归通过（含重启场景）。
+
+关闭记录：
+
+- Runtime 审计持久化（33-a）：`RuntimeApplication` 装配 `@EntityScan`/`@EnableJpaRepositories` 指向 `top.cywu.magicops.audit.*` 与 runtime 包，移除切片 30 对 `AuditController` 的扫描排除；`AuditService` 注入到真实 `AuditRecordRepository`，执行审计落共享 PostgreSQL（开发态 H2），不再走内存回退。
+- 激活包持久化与启动重载（33-b）：新增 `active_packages` 表（V10 迁移，Console 经 Flyway 建表，prod Runtime `ddl-auto=validate` 校验）、`ActivePackageEntity`/`ActivePackageRepository`；`PackageVerificationService` 提取 `verify()`，激活时落库（`PublishPackage.toMap()` 序列化为 JSON payload），`@PostConstruct reloadActivePackage()` 启动重载并重新验签；重载验签/反序列化失败时该行置 INACTIVE 并落 `PACKAGE_REJECTED` 关键审计，不激活。`AtomicReference` 保留为内存缓存。仓储可选注入（`@Autowired(required=false)`），单元测试无 Spring 时走内存缓存。
+- `PublishPackage`/`PackageManifest` 增加对称 `fromMap`（与 `toMap` 对称），`PackageReceiveController` 删除 45 行重复反序列化逻辑改用 `PublishPackage.fromMap`。
+- HttpTargetRegistry 从 DB 同步（33-c）：新增 `HttpTargetSyncService`（`@Component`，`@EnableScheduling`），启动 `@EventListener(ApplicationReadyEvent)` 即时同步 + `@Scheduled` 每 60 秒刷新，从共享 `http_targets` 表读取 enabled 目标注册/注销（JDBC，不引入重复 Entity）；`HttpTargetRegistry` 增 `ids()` 访问器供注销比对。
+- 发布下线端点（33-d）：`PackageVerificationService.deactivate()` 将 ACTIVE 行置 INACTIVE + 清缓存 + 写 `PACKAGE_DEACTIVATED` 关键审计；`POST /api/packages/deactivate` 端点受 `PushSecretAuthenticationFilter` 共享密钥保护（`PushProtocol.PACKAGE_DEACTIVATE_PATH`）。下线后 `getActivePackage()` 返回 null，查询/修复/适配端点据此拒绝执行（"没有已激活的发布包"）。回滚不走此路径--回滚是重新推送上一个已签名发布包经 `verifyAndActivate` 验签激活，表现为已签名发布动作。
+- 验证：全量 `mvn test` 285 例通过（0 失败），较切片 32 基线 277 新增 8 例：`RuntimeAuditPersistenceTest` 2、`ActivePackagePersistenceTest` 2（落库重载、篡改停用）、`HttpTargetSyncTest` 2（同步、disabled 不同步）、`PackageDeactivateTest` 2（下线后拒绝执行+关键审计、未认证 401）。既有 `PackageVerificationServiceTest`（5 例）、`PackageReceiveAuthIntegrationTest`（4 例）、`HttpTargetRegistryTest`（8 例）无回归。
+- 实现原则：复用 JDK/Spring/Jackson 标准机制与既有 `toMap`/`SigningService`/`AuditService`，未新增第三方依赖；Console 经 Flyway 拥有生产 schema，Runtime 以 `ddl-auto=validate` 校验，不自建迁移，避免 schema 双写漂移。
+- 遗留事项：Docker Compose E2E on PostgreSQL（含重启重载、审计持久化、HTTP 目标同步验证）随切片 34 收口阶段执行；达梦方言下 `http_targets` 同步与 `active_packages` TEXT 列兼容性需抽样验证。
 
 ### 切片 34：执行语义对齐（依赖切片 33，需人工确认）
 

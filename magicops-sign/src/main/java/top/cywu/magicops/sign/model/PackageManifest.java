@@ -49,6 +49,22 @@ public record PackageManifest(
             map.put("version", version);
             return map;
         }
+
+        /**
+         * 从 Map 反序列化脚本条目（与 {@link #toMap()} 对称）。
+         */
+        public static ScriptEntry fromMap(java.util.Map<String, Object> m) {
+            return new ScriptEntry(
+                    (String) m.get("scriptId"),
+                    (String) m.get("path"),
+                    (String) m.get("method"),
+                    (String) m.get("version"),
+                    (String) m.get("scenario"),
+                    (String) m.get("riskLevel"),
+                    (String) m.get("contentHash"),
+                    (String) m.get("metadataHash")
+            );
+        }
     }
 
     /**
@@ -78,5 +94,30 @@ public record PackageManifest(
         var map = toMap();
         map.remove("signature");
         return map;
+    }
+
+    /**
+     * 从 Map 反序列化 Manifest（与 {@link #toMap()} 对称）。
+     */
+    @SuppressWarnings("unchecked")
+    public static PackageManifest fromMap(Map<String, Object> map) {
+        List<Map<String, Object>> scriptMaps =
+                (List<Map<String, Object>>) map.getOrDefault("scripts", List.of());
+        List<ScriptEntry> entries = scriptMaps.stream().map(ScriptEntry::fromMap).toList();
+        Object publishedAt = map.get("publishedAt");
+        return new PackageManifest(
+                (String) map.get("projectCode"),
+                (String) map.get("environment"),
+                (String) map.get("packageVersion"),
+                (String) map.get("runtimeVersion"),
+                (String) map.get("publishedBy"),
+                publishedAt != null ? Instant.parse((String) publishedAt) : null,
+                (String) map.get("keyId"),
+                entries,
+                (String) map.get("metadataHash"),
+                (String) map.get("policyHash"),
+                (String) map.get("signAlg"),
+                (String) map.get("signature")
+        );
     }
 }

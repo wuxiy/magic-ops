@@ -5,8 +5,10 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import top.cywu.magicops.http.model.HttpTarget;
 
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -65,5 +67,12 @@ public class HttpTargetRegistry {
 
     public int size() {
         return targets.size();
+    }
+
+    /**
+     * 返回当前全部已注册目标 ID 的快照（切片 33-c，供同步服务比对注销）。
+     */
+    public Set<String> ids() {
+        return new HashSet<>(targets.keySet());
     }
 }

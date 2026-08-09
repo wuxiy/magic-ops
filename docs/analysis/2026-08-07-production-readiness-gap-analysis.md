@@ -24,7 +24,7 @@
 
 仍开放（硬阻断，上线前必须解决）：
 
-- P0-4 Runtime 闭环（A4）= 切片 33 未实现：激活包仅内存（`PackageVerificationService:44` `AtomicReference`，重启即丢全部激活状态与动态 API）；Runtime 执行审计落内存 fallback（`RuntimeApplication` 无 `@EnableJpaRepositories`/`@EntityScan`，audit Repository 注入 null，`AuditController` 因构造注入被排除扫描）；`HttpTargetRegistry.register()` 生产代码从不调用（Console `http_targets` 表与 Runtime 注册表无同步，HTTP 适配生产必返"目标未注册"）；无回滚/下线端点（Runtime 仅 6 个端点）。
+- P0-4 Runtime 闭环（A4）= 切片 33 **已关闭（2026-08-09）**：激活包落 `active_packages` 表并 `@PostConstruct` 重载验签（替换 AtomicReference 内存态）；Runtime 审计持久化（`RuntimeApplication` 装配 `@EnableJpaRepositories`/`@EntityScan`，消除内存 fallback）；`HttpTargetSyncService` 启动+定时从 `http_targets` 同步；`POST /api/packages/deactivate` 下线端点受共享密钥保护。Docker Compose E2E on PostgreSQL 待切片 34 收口执行。
 - P0-5 双轨/执行语义（A2）= 切片 34 未实现：repair 已有 contentHash 绑定，但 `query` 与 `adapter/execute` 仍执行请求体里的 SQL/target/path（`HttpAdapterController:28` 直接取请求体字段执行），签名包仅被检查"是否存在激活包"，未对齐"生产执行必须走签名发布链路"的安全模型。
 
 修正（A6）：前端构建产物现已正确 gitignore（`.gitignore` 覆盖 `magicops-console/src/main/resources/static/console/`，git 跟踪数为 0），原"前端构建产物直接提交 git"不再成立；但"前端未纳入 Maven 构建（无 frontend-maven-plugin）"仍成立。其余 A5（可观测）、A6（无 CI、集成测试全 H2、无达梦验证、Docker Compose 未真实跑）仍开放。

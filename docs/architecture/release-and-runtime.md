@@ -104,10 +104,14 @@ receive publish package
   -> verify script hashes
   -> verify metadata and policy hashes
   -> verify script status and risk policy
-  -> load route mapping
+  -> persist active package to active_packages table
   -> atomically activate package
   -> record load audit
 ```
+
+Runtime 激活包持久化（切片 33 起）：验签通过的发布包以 `PublishPackage.toMap()` 序列化为 JSON 落 `active_packages` 表（同一时刻至多一行 ACTIVE，新激活将旧行置 INACTIVE）。`@PostConstruct` 启动时读取最近 ACTIVE 行，反序列化并重新验签后激活；重载验签/反序列化失败时该行置 INACTIVE 并落 `PACKAGE_REJECTED` 关键审计，不激活，保证重启后不会加载被篡改的发布包。
+
+Console 与 Runtime 共享同一 PostgreSQL。Console 经 Flyway 拥有生产 schema，Runtime 以 `ddl-auto=validate` 校验，不自建迁移，避免 schema 双写漂移。Runtime 执行审计经共享 `AuditRecordRepository` 落 `audit_records` 表（不再走内存回退）。Runtime 启动 + 定时从 `http_targets` 表同步 HTTP 目标到注册表，打通 Console CRUD 到 Runtime 生效链路。
 
 ## Runtime 拒绝规则
 
@@ -122,7 +126,9 @@ Runtime 必须拒绝：
 - 缺少资源权限元数据的发布包；
 - 未授权 Console 身份推送的发布包。
 
-## 回滚
+## 回滚与下线
+
+下线（切片 33-d）：Console 向 `POST /api/packages/deactivate` 推送下线指令（受共享密钥认证保护）。Runtime 将 ACTIVE 行置 INACTIVE、清空激活缓存、落 `PACKAGE_DEACTIVATED` 关键审计。下线后 `getActivePackage()` 返回 null，查询/修复/适配端点据此拒绝执行（"没有已激活的发布包"）。下线后重新上线走发布链路：重新推送已签名发布包经 `verifyAndActivate` 验签激活。
 
 回滚必须表现为一次已签名发布动作。
 

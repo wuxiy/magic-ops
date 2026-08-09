@@ -28,6 +28,12 @@ public enum AuditEventType {
     /** 发布包加载。 */
     PACKAGE_LOADED,
 
+    /** 发布包拒绝（接收验签或重载验签失败，切片 33）。 */
+    PACKAGE_REJECTED,
+
+    /** 发布包下线（切片 33-d）。 */
+    PACKAGE_DEACTIVATED,
+
     /** 脚本执行。 */
     SCRIPT_EXECUTED,
 

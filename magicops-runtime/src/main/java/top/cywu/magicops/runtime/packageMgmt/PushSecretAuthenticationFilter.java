@@ -15,7 +15,7 @@ import java.io.IOException;
  * 发布包推送共享密钥认证过滤器（切片 32）。
  *
  * <p>基于 Spring Security 过滤器链的标准扩展点（{@link OncePerRequestFilter}），
- * 仅作用于 {@code POST /api/packages} 收包端点：
+ * 作用于 {@code POST /api/packages} 收包端点与 {@code POST /api/packages/deactivate} 下线端点：
  *
  * <ul>
  *   <li>Runtime 配置了 {@code magicops.runtime.push-secret} 时，请求必须携带匹配的
@@ -66,8 +66,13 @@ public class PushSecretAuthenticationFilter extends OncePerRequestFilter {
     }
 
     private boolean isPushReceiveRequest(HttpServletRequest request) {
-        return "POST".equalsIgnoreCase(request.getMethod())
-                && PushProtocol.PACKAGE_RECEIVE_PATH.equals(request.getRequestURI());
+        if (!"POST".equalsIgnoreCase(request.getMethod())) {
+            return false;
+        }
+        String uri = request.getRequestURI();
+        // 收包与下线端点均要求共享密钥认证（切片 32 收包、切片 33-d 下线）
+        return PushProtocol.PACKAGE_RECEIVE_PATH.equals(uri)
+                || PushProtocol.PACKAGE_DEACTIVATE_PATH.equals(uri);
     }
 
     private void sendUnauthorized(HttpServletResponse response, String reason) throws IOException {

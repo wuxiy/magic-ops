@@ -29,4 +29,25 @@ public record PublishPackage(
         map.put("signature", java.util.Base64.getEncoder().encodeToString(signature));
         return map;
     }
+
+    /**
+     * 从 Map 反序列化发布包（与 {@link #toMap()} 对称）。
+     *
+     * <p>用于接收推送和从持久化存储重载激活包。
+     */
+    @SuppressWarnings("unchecked")
+    public static PublishPackage fromMap(Map<String, Object> body) {
+        Map<String, Object> manifestMap = (Map<String, Object>) body.get("manifest");
+        Map<String, Object> metadata = (Map<String, Object>) body.getOrDefault("metadata", Map.of());
+        Map<String, Object> policy = (Map<String, Object>) body.getOrDefault("policy", Map.of());
+
+        Map<String, String> scriptsB64 = (Map<String, String>) body.getOrDefault("scripts", Map.of());
+        Map<String, byte[]> scripts = new java.util.LinkedHashMap<>();
+        for (var entry : scriptsB64.entrySet()) {
+            scripts.put(entry.getKey(), java.util.Base64.getDecoder().decode(entry.getValue()));
+        }
+
+        byte[] signature = java.util.Base64.getDecoder().decode((String) body.get("signature"));
+        return new PublishPackage(PackageManifest.fromMap(manifestMap), scripts, metadata, policy, signature);
+    }
 }

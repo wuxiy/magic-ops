@@ -23,21 +23,22 @@
 - 动态 API 与数据修复共用脚本生命周期决策；
 - Arthas 诊断中心需求和架构设计已完成；
 - Maven 多模块脚手架和构建/验证命令；
-- 148 个测试全部通过；
-- E2E 10 步闭环验证通过。
+- 285 个测试全部通过（截至第五阶段切片 33）；
+- E2E 12 步闭环验证通过。
 
 仍不完整或尚未验证：
 
+- 切片 34：执行语义对齐（query/adapter 执行签名包脚本而非裸请求体，需人工确认）；
 - magic-api fork 代码整合（javax → jakarta 迁移，切片 16）；
 - 达梦数据库真实环境验证（当前使用 H2）；
-- Docker Compose 端到端验证（Dockerfile 已创建，未执行 `docker-compose up`）。
+- Docker Compose 端到端验证（含 Runtime 重启重载与审计持久化）。
 
 ## 当前技术基线
 
-- 当前仓库状态：三阶段实现完成，148 个测试通过，19 张数据库表，10 个模块。
+- 当前仓库状态：五阶段切片 33 完成，285 个测试通过，20 张数据库表，11 个模块。
 - 后端栈：Java 21、Spring Boot 3.3.5、Spring Security、Spring Data JPA、Flyway、PostgreSQL。
 - 前端/编辑器目标栈：第一阶段复用或扩展 `magic-editor`，后续再评估 UI 重写。
-- 数据库 schema：Flyway V1-V6 迁移脚本管理，`ddl-auto=none`。
+- 数据库 schema：Flyway V1-V10 迁移脚本管理（Console 拥有生产 schema，Runtime 共享 PostgreSQL 以 `ddl-auto=validate` 校验）。
 - 认证：数据库用户 + BCrypt + UserDetailsService（替换了静态 admin/admin）。
 - 授权：@PreAuthorize 方法级 + @ResourcePermission 资源级 + 7 角色 17 权限。
 - 审计：PostgreSQL 持久化 + 敏感数据脱敏 + 分页查询 API。

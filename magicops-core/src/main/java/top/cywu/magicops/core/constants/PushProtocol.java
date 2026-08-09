@@ -14,6 +14,9 @@ public final class PushProtocol {
     /** Runtime 收包端点路径。 */
     public static final String PACKAGE_RECEIVE_PATH = "/api/packages";
 
+    /** Runtime 下线端点路径（切片 33-d）。Console 推送下线指令到此路径。 */
+    public static final String PACKAGE_DEACTIVATE_PATH = "/api/packages/deactivate";
+
     private PushProtocol() {
     }
 }
